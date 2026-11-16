@@ -9,7 +9,7 @@
 [![CI](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml/badge.svg)](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/amdnaji/mnshor?include_prereleases&label=Release)](https://github.com/amdnaji/mnshor/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![.NET 9.0](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![.NET 11.0](https://img.shields.io/badge/.NET-11.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Cross--Platform%20Web-0078D6)](#getting-started)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25%20In--Memory%20%7C%20Zero%20Cloud-059669)](#why-mnshor)
 
@@ -23,7 +23,7 @@
 
 **Mnshor (مَنشُور)** is a fast, privacy-first PDF and document processing suite engineered to run **100% locally on your machine**. Every document operation—merging, splitting, rotating, watermarking, stripping metadata, or converting Word (`.docx`), Excel (`.xlsx`), and Markdown (`.md`) files to PDF—executes **entirely in RAM (`MemoryStream`)** with **zero cloud uploads** and **zero temporary disk writes**.
 
-On Windows, Mnshor can run either as a lightweight background Windows Service (`MnshorService` bound strictly to `http://127.0.0.1:5157`) paired with an instant desktop launcher (`Mnshor.Launcher.exe`), or directly as a self-hosted .NET 9 web application.
+On Windows, Mnshor can run either as a lightweight background Windows Service (`MnshorService` bound strictly to `http://127.0.0.1:5157`) paired with an instant desktop launcher (`Mnshor.Launcher.exe`), or directly as a self-hosted .NET 11 web application.
 
 ---
 
@@ -68,7 +68,7 @@ flowchart LR
 
 ```text
 mnshor/
-├── Mnshor.sln                                # Solution file (.NET 9)
+├── Mnshor.sln                                # Solution file (.NET 11)
 ├── src/
 │   ├── Mnshor/                               # Main Blazor Interactive Server & Windows Service host
 │   │   ├── Components/Pages/                 # 8 interactive document tool pages
@@ -90,7 +90,7 @@ mnshor/
 
 ### Prerequisites
 
-- **[.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)** (required to build and run from source)
+- **[.NET 11.0 SDK](https://dotnet.microsoft.com/download/dotnet/11.0)** (required to build and run from source)
 - **[WiX Toolset v4+](https://wixtoolset.org/)** (optional — only required if building the `.msi` Windows installer)
 
 ### 1. Clone & Run in Development Mode
@@ -133,7 +133,7 @@ wix extension add -g WixToolset.UI.wixext
 
 | Project | Role in Mnshor | License |
 | :--- | :--- | :--- |
-| **[.NET 9 & ASP.NET Core Blazor](https://github.com/dotnet/aspnetcore)** | High-performance runtime, Interactive Server UI components, and Windows Service hosting (`Microsoft.Extensions.Hosting.WindowsServices`). | [MIT](https://github.com/dotnet/aspnetcore/blob/main/LICENSE.txt) |
+| **[.NET 11 & ASP.NET Core Blazor](https://github.com/dotnet/aspnetcore)** | High-performance runtime, Interactive Server UI components, and Windows Service hosting (`Microsoft.Extensions.Hosting.WindowsServices`). | [MIT](https://github.com/dotnet/aspnetcore/blob/main/LICENSE.txt) |
 | **[PDFsharp](https://github.com/empira/PDFsharp)** | Core in-memory PDF document reading, page assembly, splitting, rotation, metadata sanitization, and vector drawing. | [MIT](https://github.com/empira/PDFsharp/blob/master/LICENSE) |
 | **[SkiaSharp](https://github.com/mono/SkiaSharp) & [HarfBuzz](https://github.com/harfbuzz/harfbuzz)** | 2D graphics rendering, image watermark compositing, and complex Arabic (`RTL`) text shaping (`SkiaSharp.HarfBuzz`). | [MIT](https://github.com/mono/SkiaSharp/blob/main/LICENSE.md) |
 | **[Open-XML-SDK (`DocumentFormat.OpenXml`)](https://github.com/dotnet/Open-XML-SDK)** | Native in-memory parsing of Microsoft Word (`.docx`) documents and Excel (`.xlsx`) workbooks without requiring Office installation. | [MIT](https://github.com/dotnet/Open-XML-SDK/blob/main/LICENSE) |

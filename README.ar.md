@@ -9,7 +9,7 @@
 [![CI](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml/badge.svg)](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/amdnaji/mnshor?include_prereleases&label=Release)](https://github.com/amdnaji/mnshor/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![.NET 9.0](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![.NET 11.0](https://img.shields.io/badge/.NET-11.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Cross--Platform%20Web-0078D6)](#طريقة-التشغيل-والبناء-من-المصدر)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25%20In--Memory%20%7C%20Zero%20Cloud-059669)](#لماذا-منشور)
 
@@ -25,7 +25,7 @@
 
 **مَنشُور (Mnshor)** هو منصة مفتوحة المصدر وعالية الأداء لمعالجة ملفات الـ PDF والمستندات المكتبية، صُممت لتعمل **محلياً بنسبة 100% داخل جهازك**. تتم جميع العمليات—من دمج وتقسيم وتدوير وإضافة العلامات المائية وتنظيف البيانات الوصفية، إلى تحويل ملفات Word (`.docx`) و Excel (`.xlsx`) و Markdown (`.md`) إلى PDF—**بشكل كامل داخل الذاكرة العشوائية (`MemoryStream` / RAM)** دون رفع أي ملف إلى السحابة ودون كتابة أي ملفات مؤقتة على القرص الصلب.
 
-على نظام Windows، يمكن تشغيل **مَنشُور** كخدمة خلفية خفيفة (`MnshorService` تعمل حصرياً على العنوان المحلي `http://127.0.0.1:5157`) مع مشغّل فوري لسطح المكتب (`Mnshor.Launcher.exe`)، أو تشغيله مباشرةً كتطبيق ويب محلي مبني على `.NET 9`.
+على نظام Windows، يمكن تشغيل **مَنشُور** كخدمة خلفية خفيفة (`MnshorService` تعمل حصرياً على العنوان المحلي `http://127.0.0.1:5157`) مع مشغّل فوري لسطح المكتب (`Mnshor.Launcher.exe`)، أو تشغيله مباشرةً كتطبيق ويب محلي مبني على `.NET 11`.
 
 ---
 
@@ -60,7 +60,7 @@
 
 ```text
 mnshor/
-├── Mnshor.sln                                # ملف الحل البرمجي (.NET 9)
+├── Mnshor.sln                                # ملف الحل البرمجي (.NET 11)
 ├── src/
 │   ├── Mnshor/                               # تطبيق الويب المحلي (Blazor Interactive Server) وخدمة Windows
 │   │   ├── Components/Pages/                 # واجهات الأدوات الثمان التفاعلية
@@ -84,7 +84,7 @@ mnshor/
 
 ### المتطلبات الأساسية
 
-- حزمة تطوير **[.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)** (مطلوبة لتشغيل المشروع وبنائه من المصدر).
+- حزمة تطوير **[.NET 11.0 SDK](https://dotnet.microsoft.com/download/dotnet/11.0)** (مطلوبة لتشغيل المشروع وبنائه من المصدر).
 - أداة **[WiX Toolset v4+](https://wixtoolset.org/)** (اختيارية — مطلوبة فقط في حال رغبتك ببناء ملف التثبيت `.msi` لنظام Windows).
 
 ### 1. استنساخ المستودع والتشغيل المباشر
@@ -139,7 +139,7 @@ wix extension add -g WixToolset.UI.wixext
 
 | المشروع | دوره في مَنشُور | الترخيص |
 | :--- | :--- | :--- |
-| **[.NET 9 & ASP.NET Core Blazor](https://github.com/dotnet/aspnetcore)** | بيئة التشغيل عالية الأداء، مكونات الواجهة التفاعلية، واستضافة خدمة Windows (`Microsoft.Extensions.Hosting.WindowsServices`). | [MIT](https://github.com/dotnet/aspnetcore/blob/main/LICENSE.txt) |
+| **[.NET 11 & ASP.NET Core Blazor](https://github.com/dotnet/aspnetcore)** | بيئة التشغيل عالية الأداء، مكونات الواجهة التفاعلية، واستضافة خدمة Windows (`Microsoft.Extensions.Hosting.WindowsServices`). | [MIT](https://github.com/dotnet/aspnetcore/blob/main/LICENSE.txt) |
 | **[PDFsharp](https://github.com/empira/PDFsharp)** | المحرك الأساسي لقراءة وتعديل ملفات الـ PDF في الذاكرة (الدمج، التقسيم، التدوير، البيانات الوصفية، والرسم المتجهي). | [MIT](https://github.com/empira/PDFsharp/blob/master/LICENSE) |
 | **[SkiaSharp](https://github.com/mono/SkiaSharp) & [HarfBuzz](https://github.com/harfbuzz/harfbuzz)** | معالجة الرسوميات ثنائية الأبعاد، دمج شعارات العلامة المائية، وتشكيل الحروف العربية المتصلة (`SkiaSharp.HarfBuzz`). | [MIT](https://github.com/mono/SkiaSharp/blob/main/LICENSE.md) |
 | **[Open-XML-SDK (`DocumentFormat.OpenXml`)](https://github.com/dotnet/Open-XML-SDK)** | قراءة وتحليل مستندات Word (`.docx`) وجداول بيانات Excel (`.xlsx`) مباشرةً في الذاكرة دون الحاجة لتثبيت Microsoft Office. | [MIT](https://github.com/dotnet/Open-XML-SDK/blob/main/LICENSE) |
