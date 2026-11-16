@@ -14,6 +14,11 @@ namespace Mnshor.Tests;
 
 public class EngineTests
 {
+    static EngineTests()
+    {
+        PdfSharp.Fonts.GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+    }
+
     private readonly FastPdfEngine _pdfEngine = new();
     private readonly LocalWordConverter _wordConverter = new();
     private readonly LocalSpreadsheetMarkdownConverter _excelMdConverter = new();

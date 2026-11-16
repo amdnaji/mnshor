@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.StaticFiles;
 using Mnshor.Components;
 using Mnshor.Engines;
 using Mnshor.Services;
@@ -31,6 +32,8 @@ builder.Services.AddSingleton<IPdfEngine, FastPdfEngine>();
 builder.Services.AddSingleton<IWordConverter, LocalWordConverter>();
 builder.Services.AddSingleton<ISpreadsheetMarkdownConverter, LocalSpreadsheetMarkdownConverter>();
 
+PdfSharp.Fonts.GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+
 var app = builder.Build();
 
 var localizationOptions = new RequestLocalizationOptions()
@@ -57,7 +60,13 @@ if (hasHttpsEndpoint)
 {
     app.UseHttpsRedirection();
 }
-app.UseStaticFiles();
+var contentTypes = new FileExtensionContentTypeProvider();
+contentTypes.Mappings[".mjs"] = "text/javascript";
+contentTypes.Mappings[".wasm"] = "application/wasm";
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = contentTypes
+});
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
