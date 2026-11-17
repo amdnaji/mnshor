@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
+    <Version>0.2.0-alpha</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Version>0.1.0</Version>
@@ -22,6 +23,8 @@
     <None Remove="Components\Pages\Promo.razor" />
     <Content Remove="wwwroot\css\promo-motion.css" />
     <None Remove="wwwroot\css\promo-motion.css" />
+    <Content Remove="wwwroot\demo\**" />
+    <None Remove="wwwroot\demo\**" />
   </ItemGroup>
 
 </Project>

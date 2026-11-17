@@ -17,4 +17,5 @@ public interface IPdfEngine
     PdfMetadataModel GetMetadata(byte[] pdfData);
     Task<ExecutionResult> UpdateMetadataAsync(DocumentItem document, PdfMetadataModel metadata, bool sanitizeAll = false);
     Task<ExecutionResult> WatermarkAsync(DocumentItem document, PdfWatermarkOptions options);
+    Task<ExecutionResult> SignPdfAsync(DocumentItem document, PdfSignOptions options);
 }

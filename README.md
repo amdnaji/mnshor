@@ -8,6 +8,7 @@
 
 [![CI](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml/badge.svg)](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/amdnaji/mnshor?include_prereleases&label=Release)](https://github.com/amdnaji/mnshor/releases)
+[![Version](https://img.shields.io/badge/Version-0.2.0--alpha-D4A359)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET 11.0](https://img.shields.io/badge/.NET-11.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Cross--Platform%20Web-0078D6)](#getting-started)
@@ -49,6 +50,7 @@ On Windows, Mnshor can run either as a lightweight background Windows Service (`
 | **6. Metadata & Privacy Sanitizer** | Inspect, edit, or completely strip hidden PDF metadata. | Edit `Title`, `Author`, `Subject`, `Keywords`, `Creator`, `Producer`, or use **One-Click Privacy Sanitizer** to wipe all hidden properties and XMP streams. |
 | **7. Watermark PDF** | Stamp text or image logos across PDF pages with live preview. | Text & image watermarks, Arabic shaping, 9-grid positioning, **Mosaic Tiling**, opacity, custom rotation, Over/Below content layer, page range targeting. |
 | **8. Word, Excel & Markdown to PDF** | Convert `.docx`, `.xlsx`, and `.md` files into print-ready PDFs in RAM. | **Word (`.docx`)**: Headings, tables, lists, inline styling, images, RTL/LTR.<br>**Excel (`.xlsx`)**: Multi-sheet selector, live preview, Landscape/Portrait, A4/A3/Letter, RTL/LTR column flow, repeating headers, zebra striping, gridlines.<br>**Markdown (`.md`) Studio**: Live editor with English & Arabic sample templates, tables, code blocks, blockquotes, and auto-direction. |
+| **9. Sign PDF Document** | Sign and stamp PDFs interactively in memory with OS fonts, freehand drawing, or image stamps. | **Type (OS Fonts)** with Arabic & English script fonts and flourish underline, **Draw Freehand** canvas, **Upload Image/Stamp** with ink tinting, interactive drag/drop/resize for **Signature**, **Date**, and **Official Stamp** fields, high-DPI preview up to 500 MB. |
 
 ---
 
@@ -122,7 +124,7 @@ dotnet tool install --global wix
 wix extension add -g WixToolset.UI.wixext
 
 # Build the MSI package into ./dist/
-.\installer\build-msi.ps1 -Version 0.1.0 -Stage alpha
+.\installer\build-msi.ps1 -Version 0.2.0 -Stage alpha
 ```
 
 ---

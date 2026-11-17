@@ -1,0 +1,1436 @@
+@page "/sign"
+@page "/sign-pdf"
+@rendermode InteractiveServer
+@using System.Globalization
+@inject LocalizationState Loc
+@inject IPdfEngine PdfEngine
+@inject OsFontService FontService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>@Loc["SignPdfTitle"] - @Loc["AppName"]</PageTitle>
+
+<a href="/" class="back-link">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="@(Loc.IsRtl ? "transform: rotate(180deg);" : "")">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+    </svg>
+    <span>@Loc["BackToTools"]</span>
+</a>
+
+<div class="panel-card">
+    <div class="panel-header">
+        <div>
+            <h1 class="panel-title">@Loc["SignPdfTitle"]</h1>
+            <p class="panel-desc">@Loc["SignPdfDesc"]</p>
+        </div>
+    </div>
+
+    @if (selectedFile == null)
+    {
+        <label class="smart-dropzone">
+            <InputFile class="dropzone-input-overlay" OnChange="OnFileSelected" accept=".pdf" />
+            <div class="dropzone-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+            </div>
+            <div class="dropzone-text">@Loc["DragDropPrompt"]</div>
+            <div class="dropzone-subtext">PDF files only — Interactive OS Font & Freehand Signing (Max 500 MB)</div>
+        </label>
+    }
+    else
+    {
+        <div class="sign-workspace">
+            <!-- Left Main Stage: Document Header, Page Navigator & Interactive PDF Signing Canvas -->
+            <div class="watermark-main-stage">
+                <!-- Document Meta Header -->
+                <div class="file-item" style="margin-bottom: 1rem;">
+                    <div class="file-info">
+                        <div class="file-icon" style="color: var(--brand-primary);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="file-name">@selectedFile.FileName</div>
+                            <div class="file-meta-badges">
+                                <span class="file-badge">@selectedFile.FormattedSize</span>
+                                <span class="file-badge badge-accent">
+                                    @selectedFile.PageCount @Loc["PagesCount"]
+                                </span>
+                                <span class="file-badge" style="background: var(--success-surface); color: var(--success); border-color: var(--success-border);">
+                                    @Loc["PlacedFieldsCount"] @signOptions.Fields.Count
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <button type="button" class="btn-tool-action" @onclick="OpenSignatureModalAsync">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                            <span>@Loc["EditSignatureBtn"]</span>
+                        </button>
+
+                        <button type="button" class="btn-lang" @onclick="ResetFileAsync" style="color: var(--danger); border-color: var(--danger-border); background: var(--danger-surface);">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                            <span>@Loc["Remove"]</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Page Switcher Bar -->
+                <div class="large-pdf-nav-bar">
+                    <div class="nav-bar-group">
+                        <button type="button" class="btn-tool-action" style="padding: 0.35rem 0.8rem;"
+                                disabled="@(activePageNum <= 1)" @onclick="PrevPageAsync">
+                            @Loc["PrevView"]
+                        </button>
+
+                        <span style="font-weight: 700; padding: 0 0.45rem; font-size: 0.92rem;">
+                            @Loc["Page"] @activePageNum @Loc["Of"] @selectedFile.PageCount
+                        </span>
+
+                        <button type="button" class="btn-tool-action" style="padding: 0.35rem 0.8rem;"
+                                disabled="@(activePageNum >= selectedFile.PageCount)" @onclick="NextPageAsync">
+                            @Loc["NextView"]
+                        </button>
+                    </div>
+
+                    <div class="nav-bar-group">
+                        <label style="font-weight: 600; color: var(--text-secondary);">@Loc["JumpToPage"]</label>
+                        <input type="number" min="1" max="@selectedFile.PageCount" @bind="jumpPageInput" class="compact-input" style="width: 68px;" />
+                        <button type="button" class="btn-tool-action" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;" @onclick="JumpToPageAsync">
+                            @Loc["JumpButton"]
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Interactive High-Resolution PDF Page Stage -->
+                <div class="sign-stage-wrapper">
+                    <div id="sign-page-stage" class="sign-page-viewport">
+                        <canvas id="sign-stage-canvas" class="sign-page-canvas"></canvas>
+
+                        @foreach (var field in GetFieldsVisibleOnPage(activePageNum))
+                        {
+                            bool isSelected = selectedField?.Id == field.Id;
+                            string domId = $"sign-field-{field.Id:N}";
+                            string leftPct = (field.XPercent * 100.0).ToString("F2", CultureInfo.InvariantCulture);
+                            string topPct = (field.YPercent * 100.0).ToString("F2", CultureInfo.InvariantCulture);
+                            string widthPct = (field.WidthPercent * 100.0).ToString("F2", CultureInfo.InvariantCulture);
+                            string opacityVal = (field.OpacityPercent / 100.0).ToString("F2", CultureInfo.InvariantCulture);
+
+                            <div @key="field.Id"
+                                 id="@domId"
+                                 class="sign-placed-field @(isSelected ? "selected-field" : "")"
+                                 style="left: @(leftPct)%; top: @(topPct)%; width: @(widthPct)%; opacity: @opacityVal; transform: rotate(@(field.RotationDegrees)deg);"
+                                 @onpointerdown="(e) => OnFieldPointerDownAsync(e, field, domId)"
+                                 @onclick:stopPropagation="true">
+
+                                @if (isSelected)
+                                {
+                                    <div class="sign-field-floating-bar" @onpointerdown:stopPropagation="true">
+                                        <button type="button" class="sign-field-mini-btn" title="Smaller" @onclick="() => AdjustFieldWidth(field, -0.03)">−</button>
+                                        <button type="button" class="sign-field-mini-btn" title="Larger" @onclick="() => AdjustFieldWidth(field, 0.03)">+</button>
+                                        <button type="button" class="sign-field-mini-btn" title="@Loc["ApplyAllPages"]" @onclick="() => ToggleFieldAllPages(field)">
+                                            @(field.PageScope == SignPageScope.AllPages ? "★ All" : "∀ All")
+                                        </button>
+                                        <button type="button" class="sign-field-mini-btn danger" title="@Loc["DeleteFieldBtn"]" @onclick="() => RemoveField(field)">✕</button>
+                                    </div>
+                                }
+
+                                @if (!string.IsNullOrEmpty(field.PreviewDataUrl))
+                                {
+                                    <img src="@field.PreviewDataUrl" alt="@field.Text" />
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @if (signOptions.Fields.Count == 0)
+                    {
+                        <div style="margin-top: 0.9rem; font-size: 0.86rem; color: var(--text-secondary); font-weight: 600; text-align: center;">
+                            @Loc["NoFieldsPlacedNotice"]
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Right Sidebar: iLovePDF Signing Toolkit & Selected Field Inspector -->
+            <aside class="watermark-sidebar">
+                <div class="watermark-sidebar-header">
+                    @Loc["SigningToolkitTitle"]
+                </div>
+
+                <div class="watermark-sidebar-body">
+                    <!-- Active Signature Preview Card -->
+                    <div class="wm-section">
+                        <div class="wm-label">
+                            <span>@Loc["ActiveSignatureCardTitle"]</span>
+                            <button type="button" class="wm-preset-chip active" @onclick="OpenSignatureModalAsync">
+                                ✎ @Loc["EditSignatureBtn"]
+                            </button>
+                        </div>
+
+                        <div class="sign-active-sig-box" @onclick="() => AddFieldToActivePage(SignFieldType.Signature)" style="cursor: pointer;" title="Click to place on page">
+                            @if (!string.IsNullOrEmpty(activeSignaturePreviewUrl))
+                            {
+                                <img src="@activeSignaturePreviewUrl" alt="Active Signature" />
+                            }
+                            <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: 600;">
+                                @activeSignatureFontName • @(Loc.IsRtl ? "انقر للإدراج على الصفحة" : "Click to stamp on page")
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- One-Click Field Palette (Signature, Initials, Date, Name, Text, Stamp) -->
+                    <div class="wm-section">
+                        <label class="wm-label">@Loc["ClickToAddHint"]</label>
+                        <div class="sign-palette-grid">
+                            <button type="button" class="sign-palette-btn" @onclick="() => AddFieldToActivePage(SignFieldType.Signature)">
+                                <span>✍️</span>
+                                <span>+ @Loc["AddSignatureField"]</span>
+                            </button>
+
+                            <button type="button" class="sign-palette-btn" @onclick="() => AddFieldToActivePage(SignFieldType.Initials)">
+                                <span>🔤</span>
+                                <span>+ @Loc["AddInitialsField"]</span>
+                            </button>
+
+                            <button type="button" class="sign-palette-btn" @onclick="() => AddFieldToActivePage(SignFieldType.Name)">
+                                <span>👤</span>
+                                <span>+ @Loc["AddNameField"]</span>
+                            </button>
+
+                            <button type="button" class="sign-palette-btn" @onclick="() => AddFieldToActivePage(SignFieldType.Date)">
+                                <span>📅</span>
+                                <span>+ @Loc["AddDateField"]</span>
+                            </button>
+
+                            <button type="button" class="sign-palette-btn" @onclick="() => AddFieldToActivePage(SignFieldType.CustomText)">
+                                <span>📝</span>
+                                <span>+ @Loc["AddCustomTextField"]</span>
+                            </button>
+
+                            <button type="button" class="sign-palette-btn" @onclick="() => AddFieldToActivePage(SignFieldType.Stamp)">
+                                <span>🏢</span>
+                                <span>+ @Loc["AddOfficialStampField"]</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Selected Placed Field Inspector -->
+                    @if (selectedField != null)
+                    {
+                        <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.9rem; display: flex; flex-direction: column; gap: 0.85rem;">
+                            <div class="wm-label" style="color: var(--brand-primary);">
+                                <span>⚙ @Loc["SelectedFieldInspector"] (@selectedField.FieldType)</span>
+                                <div style="display: flex; gap: 0.3rem;">
+                                    <button type="button" class="wm-preset-chip" @onclick="() => DuplicateSelectedField(selectedField)">
+                                        @Loc["DuplicateFieldBtn"]
+                                    </button>
+                                    <button type="button" class="wm-preset-chip" style="color: var(--danger);" @onclick="() => RemoveField(selectedField)">
+                                        @Loc["DeleteFieldBtn"]
+                                    </button>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(selectedField.Text))
+                            {
+                                <!-- Field Text Input -->
+                                <div class="wm-section">
+                                    <label class="wm-label">@Loc["FieldTextLabel"]</label>
+                                    <input type="text"
+                                           dir="auto"
+                                           class="compact-input"
+                                           style="width: 100%; padding: 0.45rem 0.65rem;"
+                                           value="@selectedField.Text"
+                                           @oninput="(e) => OnSelectedFieldTextChanged(selectedField, e.Value?.ToString() ?? string.Empty)" />
+                                </div>
+
+                                <!-- OS Font Picker for Selected Field -->
+                                <div class="wm-section">
+                                    <label class="wm-label">@Loc["OsFontLabel"]</label>
+                                    <select class="compact-input"
+                                            style="width: 100%; padding: 0.45rem;"
+                                            value="@selectedField.FontFamily"
+                                            @onchange="(e) => OnSelectedFieldFontChanged(selectedField, e.Value?.ToString() ?? string.Empty)">
+                                        <optgroup label="@Loc["FontCatSignature"]">
+                                            @foreach (var sf in signatureFontPresets)
+                                            {
+                                                <option value="@sf.FamilyName">@sf.DisplayName</option>
+                                            }
+                                        </optgroup>
+                                        <optgroup label="@Loc["FontCatArabic"]">
+                                            @foreach (var af in arabicFontPresets)
+                                            {
+                                                <option value="@af.FamilyName">@af.DisplayName</option>
+                                            }
+                                        </optgroup>
+                                        <optgroup label="@Loc["FontCatAllOs"]">
+                                            @foreach (var osFam in allInstalledOsFonts)
+                                            {
+                                                <option value="@osFam">@osFam</option>
+                                            }
+                                        </optgroup>
+                                    </select>
+                                </div>
+
+                                <!-- Ink Color & Bold/Italic for Selected Field -->
+                                <div class="wm-section">
+                                    <label class="wm-label">@Loc["InkColorLabel"]</label>
+                                    <div class="wm-color-row">
+                                        @foreach (var swatch in InkColorSwatches)
+                                        {
+                                            <button type="button"
+                                                    class="wm-color-swatch @(string.Equals(selectedField.TextColorHex, swatch, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+                                                    style="background-color: @swatch;"
+                                                    @onclick="() => OnSelectedFieldColorChanged(selectedField, swatch)">
+                                            </button>
+                                        }
+                                        <button type="button"
+                                                class="wm-style-btn @(selectedField.IsBold ? "active" : "")"
+                                                style="margin-inline-start: auto;"
+                                                @onclick="() => ToggleSelectedFieldBold(selectedField)">B</button>
+                                        <button type="button"
+                                                class="wm-style-btn @(selectedField.IsItalic ? "active" : "")"
+                                                style="font-style: italic;"
+                                                @onclick="() => ToggleSelectedFieldItalic(selectedField)">I</button>
+                                    </div>
+                                </div>
+                            }
+
+                            <!-- Size (% of Page Width) -->
+                            <div class="wm-section">
+                                <label class="wm-label">
+                                    <span>@Loc["FieldSizeLabel"]</span>
+                                    <span style="color: var(--brand-primary);">@((int)Math.Round(selectedField.WidthPercent * 100))%</span>
+                                </label>
+                                <input type="range" min="6" max="65" step="1"
+                                       value="@((int)Math.Round(selectedField.WidthPercent * 100))"
+                                       @oninput="(e) => OnSelectedFieldSizeInput(selectedField, e.Value?.ToString())" />
+                            </div>
+
+                            <!-- Rotation & Opacity -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;">
+                                <div class="wm-section">
+                                    <label class="wm-label">
+                                        <span>@Loc["Rotation"]</span>
+                                        <span>@(selectedField.RotationDegrees)°</span>
+                                    </label>
+                                    <input type="range" min="-45" max="45" step="5"
+                                           @bind="selectedField.RotationDegrees"
+                                           @bind:event="oninput" />
+                                </div>
+
+                                <div class="wm-section">
+                                    <label class="wm-label">
+                                        <span>@Loc["Transparency"]</span>
+                                        <span>@(selectedField.OpacityPercent)%</span>
+                                    </label>
+                                    <input type="range" min="25" max="100" step="5"
+                                           @bind="selectedField.OpacityPercent"
+                                           @bind:event="oninput" />
+                                </div>
+                            </div>
+
+                            <!-- Target Page Scope -->
+                            <div class="wm-section">
+                                <label class="wm-label">@Loc["FieldApplyPagesLabel"]</label>
+                                <select class="compact-input" style="width: 100%; padding: 0.45rem;" @bind="selectedField.PageScope">
+                                    <option value="@SignPageScope.SpecificPage">@Loc["ApplyCurrentPage"] (@Loc["Page"] @selectedField.TargetPage)</option>
+                                    <option value="@SignPageScope.AllPages">@Loc["ApplyAllPages"] (1–@selectedFile.PageCount)</option>
+                                    <option value="@SignPageScope.LastPage">@Loc["ApplyLastPage"] (@Loc["Page"] @selectedFile.PageCount)</option>
+                                    <option value="@SignPageScope.CustomRange">@Loc["ApplyCustomRange"]</option>
+                                </select>
+
+                                @if (selectedField.PageScope == SignPageScope.CustomRange)
+                                {
+                                    <input type="text"
+                                           class="compact-input"
+                                           style="width: 100%; margin-top: 0.35rem; padding: 0.45rem;"
+                                           placeholder="@Loc["RangePlaceholder"]"
+                                           @bind="selectedField.CustomRange"
+                                           @bind:event="oninput" />
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="watermark-sidebar-footer">
+                    <button type="button"
+                            class="btn-primary-action"
+                            disabled="@(isProcessing || signOptions.Fields.Count == 0)"
+                            @onclick="ExecuteSignPdfAsync">
+                        @if (isProcessing)
+                        {
+                            <span>@Loc["Processing"]</span>
+                        }
+                        else
+                        {
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                            <span>@Loc["SignPdfButton"]</span>
+                        }
+                    </button>
+                </div>
+            </aside>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="margin-top: 1.25rem; padding: 0.85rem 1.25rem; background: var(--danger-surface); border: 1px solid var(--danger-border); border-radius: 8px; color: var(--danger); font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span>@errorMessage</span>
+        </div>
+    }
+
+    <!-- Result Telemetry -->
+    @if (lastResult != null && lastResult.Success)
+    {
+        <div class="telemetry-card">
+            <div class="telemetry-header">
+                <span style="display: flex; align-items: center; gap: 0.4rem;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>@Loc["SignPdfSuccess"]</span>
+                </span>
+                <span class="telemetry-speed">⚡ @lastResult.ElapsedMilliseconds @Loc["Milliseconds"]</span>
+            </div>
+            <div class="telemetry-summary">
+                @lastResult.Summary
+            </div>
+            <div class="telemetry-note">
+                @Loc["ZeroDiskIoNotice"]
+            </div>
+            <div style="margin-top: 0.35rem;">
+                <button type="button" class="btn-primary-action" style="padding: 0.65rem 1.5rem; font-size: 0.92rem; width: auto;" @onclick="DownloadAgainAsync">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>@Loc["DownloadResult"] (@lastResult.OutputFileName)</span>
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- =========================================================================
+     iLovePDF-Style "Set Your Signature Details" Studio Modal (OS Fonts / Draw / Upload)
+     ========================================================================= -->
+@if (isSignatureModalOpen)
+{
+    <div class="sign-modal-backdrop" @onclick="CloseSignatureModal">
+        <div class="sign-modal-card" @onclick:stopPropagation="true">
+            <div class="sign-modal-header">
+                <div style="display: flex; align-items: center; gap: 0.55rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--brand-primary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9"></path>
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                    </svg>
+                    <span style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">@Loc["SetSignatureDetails"]</span>
+                </div>
+
+                <button type="button" class="action-icon-btn" @onclick="CloseSignatureModal">✕</button>
+            </div>
+
+            <!-- Full Name & Initials Row -->
+            <div style="padding: 1rem 1.5rem 0.5rem 1.5rem; background: var(--bg-surface);">
+                <div class="sign-name-initials-row">
+                    <div class="wm-section">
+                        <label class="wm-label">@Loc["FullNameLabel"]</label>
+                        <input type="text"
+                               dir="auto"
+                               class="compact-input"
+                               style="width: 100%; padding: 0.55rem 0.75rem; font-size: 0.95rem;"
+                               value="@signOptions.SignerFullName"
+                               @oninput="OnModalFullNameInput" />
+                    </div>
+
+                    <div class="wm-section">
+                        <label class="wm-label">@Loc["InitialsLabel"]</label>
+                        <input type="text"
+                               dir="auto"
+                               class="compact-input"
+                               style="width: 100%; padding: 0.55rem 0.75rem; font-size: 0.95rem;"
+                               @bind="signOptions.SignerInitials"
+                               @bind:event="oninput" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3 Creation Mode Tabs: Type (OS Fonts) | Draw | Upload -->
+            <div class="watermark-mode-tabs" style="grid-template-columns: repeat(3, 1fr);">
+                <button type="button"
+                        class="watermark-mode-tab @(modalInputMethod == SignatureInputMethod.TypeOsFont ? "active" : "")"
+                        @onclick="() => SwitchModalTabAsync(SignatureInputMethod.TypeOsFont)">
+                    <span>⌨️ @Loc["SignTabTypeOsFont"]</span>
+                </button>
+
+                <button type="button"
+                        class="watermark-mode-tab @(modalInputMethod == SignatureInputMethod.DrawFreehand ? "active" : "")"
+                        @onclick="() => SwitchModalTabAsync(SignatureInputMethod.DrawFreehand)">
+                    <span>✍️ @Loc["SignTabDraw"]</span>
+                </button>
+
+                <button type="button"
+                        class="watermark-mode-tab @(modalInputMethod == SignatureInputMethod.UploadImage ? "active" : "")"
+                        @onclick="() => SwitchModalTabAsync(SignatureInputMethod.UploadImage)">
+                    <span>🖼️ @Loc["SignTabUpload"]</span>
+                </button>
+            </div>
+
+            <div class="sign-modal-body">
+                @if (modalInputMethod == SignatureInputMethod.TypeOsFont)
+                {
+                    <!-- OS Font Category Pills & Search -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                        <div class="wm-preset-chips">
+                            <button type="button"
+                                    class="wm-preset-chip @(activeFontCategoryTab == OsFontCategory.SignatureScript ? "active" : "")"
+                                    @onclick="() => activeFontCategoryTab = OsFontCategory.SignatureScript">
+                                @Loc["FontCatSignature"] (@signatureFontPresets.Count)
+                            </button>
+
+                            <button type="button"
+                                    class="wm-preset-chip @(activeFontCategoryTab == OsFontCategory.ArabicCalligraphy ? "active" : "")"
+                                    @onclick="() => activeFontCategoryTab = OsFontCategory.ArabicCalligraphy">
+                                @Loc["FontCatArabic"] (@arabicFontPresets.Count)
+                            </button>
+
+                            <button type="button"
+                                    class="wm-preset-chip @(activeFontCategoryTab == OsFontCategory.SystemFont ? "active" : "")"
+                                    @onclick="() => activeFontCategoryTab = OsFontCategory.SystemFont">
+                                @Loc["FontCatAllOs"] (@allInstalledOsFonts.Count)
+                            </button>
+                        </div>
+
+                        @if (activeFontCategoryTab == OsFontCategory.SystemFont)
+                        {
+                            <input type="text"
+                                   class="compact-input"
+                                   style="width: 220px; padding: 0.35rem 0.65rem;"
+                                   placeholder="@Loc["SearchOsFontsPlaceholder"]"
+                                   @bind="osFontSearchQuery"
+                                   @bind:event="oninput" />
+                        }
+                    </div>
+
+                    <!-- Live Visual OS Font Cards Grid -->
+                    <div class="os-font-grid">
+                        @foreach (var fontItem in GetVisibleModalFonts())
+                        {
+                            bool isSelectedFont = string.Equals(selectedModalOsFont, fontItem.FamilyName, StringComparison.OrdinalIgnoreCase);
+                            string previewUrl = GetModalFontPreviewDataUrl(fontItem.FamilyName);
+
+                            <div @key="fontItem.FamilyName"
+                                 class="os-font-card @(isSelectedFont ? "active" : "")"
+                                 @onclick="() => selectedModalOsFont = fontItem.FamilyName">
+                                <div class="os-font-card-header">
+                                    <span>@fontItem.DisplayName</span>
+                                    @if (isSelectedFont)
+                                    {
+                                        <span style="color: var(--brand-primary);">✓</span>
+                                    }
+                                </div>
+                                <div class="os-font-card-preview">
+                                    <img src="@previewUrl" alt="@fontItem.DisplayName" />
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Ink Color, Italic/Bold & Signature Underline Flourish -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem; padding-top: 0.25rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.82rem; font-weight: 700;">@Loc["InkColorLabel"]</span>
+                            @foreach (var swatch in InkColorSwatches)
+                            {
+                                <button type="button"
+                                        class="wm-color-swatch @(string.Equals(modalInkColorHex, swatch, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+                                        style="background-color: @swatch;"
+                                        @onclick="() => modalInkColorHex = swatch">
+                                </button>
+                            }
+                        </div>
+
+                        <label style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" @bind="modalIncludeUnderlineFlourish" style="accent-color: var(--brand-primary);" />
+                            <span>@Loc["SignatureUnderlineToggle"]</span>
+                        </label>
+                    </div>
+                }
+                else if (modalInputMethod == SignatureInputMethod.DrawFreehand)
+                {
+                    <!-- Freehand Signature Pad -->
+                    <div class="sig-pad-wrapper">
+                        <canvas id="freehand-sig-canvas" width="680" height="210" class="sig-pad-canvas"></canvas>
+                        <div class="sig-pad-baseline"></div>
+                        <span style="font-size: 0.76rem; color: var(--text-muted); padding: 0.35rem 0;">
+                            @Loc["DrawHereHint"]
+                        </span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.82rem; font-weight: 700;">@Loc["InkColorLabel"]</span>
+                            @foreach (var swatch in InkColorSwatches)
+                            {
+                                <button type="button"
+                                        class="wm-color-swatch @(string.Equals(modalInkColorHex, swatch, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+                                        style="background-color: @swatch;"
+                                        @onclick="() => UpdateDrawPadStyleAsync(swatch, modalPenStrokeWidth)">
+                                </button>
+                            }
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 0.55rem;">
+                            <span style="font-size: 0.82rem; font-weight: 700;">@Loc["PenThicknessLabel"]</span>
+                            <input type="range" min="1.5" max="7.5" step="0.5"
+                                   value="@modalPenStrokeWidth.ToString(CultureInfo.InvariantCulture)"
+                                   @oninput="OnPenWidthSliderInputAsync"
+                                   style="width: 110px;" />
+                            <button type="button" class="btn-tool-action" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" @onclick="ClearDrawPadAsync">
+                                @Loc["ClearPadBtn"]
+                            </button>
+                        </div>
+                    </div>
+                }
+                else if (modalInputMethod == SignatureInputMethod.UploadImage)
+                {
+                    <!-- Upload Signature or Stamp Scan -->
+                    <label class="smart-dropzone" style="padding: 1.75rem 1rem;">
+                        <InputFile class="dropzone-input-overlay" OnChange="OnSignatureImageUploadedAsync" accept=".png,.jpg,.jpeg,.webp" />
+                        <div class="dropzone-text" style="font-size: 0.95rem;">@Loc["UploadSignaturePrompt"]</div>
+                    </label>
+
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between;">
+                        <label style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; cursor: pointer;">
+                            <input type="checkbox"
+                                   checked="@uploadRemoveWhiteBg"
+                                   @onchange="(e) => OnUploadOptionChanged(e.Value is bool b && b, uploadTintInk)"
+                                   style="accent-color: var(--brand-primary);" />
+                            <span>@Loc["RemoveWhiteBgToggle"]</span>
+                        </label>
+
+                        <label style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; cursor: pointer;">
+                            <input type="checkbox"
+                                   checked="@uploadTintInk"
+                                   @onchange="(e) => OnUploadOptionChanged(uploadRemoveWhiteBg, e.Value is bool b && b)"
+                                   style="accent-color: var(--brand-primary);" />
+                            <span>@Loc["TintUploadedInkToggle"]</span>
+                        </label>
+
+                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                            @foreach (var swatch in InkColorSwatches)
+                            {
+                                <button type="button"
+                                        class="wm-color-swatch @(string.Equals(modalInkColorHex, swatch, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+                                        style="background-color: @swatch;"
+                                        @onclick="() => OnUploadColorSwatchClicked(swatch)">
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    @if (processedUploadPngBytes != null && processedUploadPngBytes.Length > 0)
+                    {
+                        <div class="sign-active-sig-box" style="background: repeating-conic-gradient(#F1F5F9 0% 25%, #FFFFFF 0% 50%) 50% / 16px 16px; padding: 1rem;">
+                            <img src="@($"data:image/png;base64,{Convert.ToBase64String(processedUploadPngBytes)}")" alt="Uploaded Signature Preview" style="max-height: 85px;" />
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="sign-modal-footer">
+                <button type="button" class="btn-lang" @onclick="CloseSignatureModal">
+                    @Loc["CancelBtn"]
+                </button>
+                <button type="button" class="btn-primary-action" style="width: auto; padding: 0.65rem 1.75rem;" @onclick="ApplySignatureModalAsync">
+                    @Loc["ApplySignatureModalBtn"]
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly string[] InkColorSwatches =
+    [
+        "#0F172A", // Classic Black Ink
+        "#1D4ED8", // Fountain Pen Blue
+        "#1E3A8A", // Executive Navy
+        "#DC2626", // Official Red Stamp
+        "#059669", // Emerald Seal
+        "#6D28D9"  // Royal Purple
+    ];
+
+    private DocumentItem? selectedFile;
+    private PdfSignOptions signOptions = new();
+    private PdfSignatureField? selectedField;
+
+    private int activePageNum = 1;
+    private int jumpPageInput = 1;
+    private bool shouldInitPdfStage = false;
+    private bool shouldRenderActivePage = false;
+
+    // OS Font Catalogs
+    private IReadOnlyList<OsFontDescriptor> signatureFontPresets = Array.Empty<OsFontDescriptor>();
+    private IReadOnlyList<OsFontDescriptor> arabicFontPresets = Array.Empty<OsFontDescriptor>();
+    private IReadOnlyList<string> allInstalledOsFonts = Array.Empty<string>();
+
+    // Active configured Signature & Initials state
+    private byte[]? activeSignaturePngBytes;
+    private double activeSignatureAspect = 3.2;
+    private string activeSignaturePreviewUrl = string.Empty;
+    private string activeSignatureFontName = "Segoe Script";
+    private byte[]? activeInitialsPngBytes;
+    private double activeInitialsAspect = 1.6;
+
+    // Signature Details Studio Modal State
+    private bool isSignatureModalOpen = false;
+    private SignatureInputMethod modalInputMethod = SignatureInputMethod.TypeOsFont;
+    private OsFontCategory activeFontCategoryTab = OsFontCategory.SignatureScript;
+    private string selectedModalOsFont = "Segoe Script";
+    private string osFontSearchQuery = string.Empty;
+    private string modalInkColorHex = "#1D4ED8";
+    private bool modalIncludeUnderlineFlourish = true;
+    private float modalPenStrokeWidth = 3.2f;
+
+    // Upload Image Mode State
+    private byte[]? rawUploadedImageBytes;
+    private byte[]? processedUploadPngBytes;
+    private double processedUploadAspect = 3.0;
+    private bool uploadRemoveWhiteBg = true;
+    private bool uploadTintInk = false;
+
+    private DotNetObjectReference<SignPdf>? dotNetRef;
+    private bool isProcessing = false;
+    private string? errorMessage;
+    private ExecutionResult? lastResult;
+
+    protected override void OnInitialized()
+    {
+        Loc.OnChange += OnLanguageChanged;
+        dotNetRef = DotNetObjectReference.Create(this);
+
+        signatureFontPresets = FontService.GetSignatureFonts();
+        arabicFontPresets = FontService.GetArabicFonts();
+        allInstalledOsFonts = FontService.GetInstalledFontFamilies();
+
+        InitializeDefaultSignerIdentity();
+    }
+
+    private void InitializeDefaultSignerIdentity()
+    {
+        if (Loc.IsRtl)
+        {
+            signOptions.SignerFullName = "أحمد المنصور";
+            signOptions.SignerInitials = "أ.م";
+            activeFontCategoryTab = OsFontCategory.ArabicCalligraphy;
+            selectedModalOsFont = arabicFontPresets.FirstOrDefault()?.FamilyName ?? "Aldhabi";
+        }
+        else
+        {
+            signOptions.SignerFullName = "Ahmed Al-Mansoor";
+            signOptions.SignerInitials = "AM";
+            activeFontCategoryTab = OsFontCategory.SignatureScript;
+            selectedModalOsFont = signatureFontPresets.FirstOrDefault()?.FamilyName ?? "Segoe Script";
+        }
+
+        RefreshActiveTypedSignature();
+    }
+
+    private void OnLanguageChanged()
+    {
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (shouldInitPdfStage && selectedFile != null)
+        {
+            shouldInitPdfStage = false;
+            await JS.InvokeVoidAsync("mnshor.initLazyPdfPreview", "pdf-thumbnails-grid", selectedFile.Data);
+            await JS.InvokeVoidAsync("mnshor.renderHighResSignPage", "sign-stage-canvas", activePageNum);
+        }
+        else if (shouldRenderActivePage && selectedFile != null)
+        {
+            shouldRenderActivePage = false;
+            await JS.InvokeVoidAsync("mnshor.renderHighResSignPage", "sign-stage-canvas", activePageNum);
+        }
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        lastResult = null;
+        var file = e.File;
+
+        if (!file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            errorMessage = "Please select a valid PDF file.";
+            return;
+        }
+
+        try
+        {
+            using var ms = new MemoryStream();
+            using var stream = file.OpenReadStream(maxAllowedSize: 500 * 1024 * 1024);
+            await stream.CopyToAsync(ms);
+            var data = ms.ToArray();
+            int pages = PdfEngine.GetPageCount(data);
+
+            if (pages <= 0)
+            {
+                errorMessage = "Could not read pages from the selected PDF file.";
+                return;
+            }
+
+            selectedFile = new DocumentItem
+            {
+                FileName = file.Name,
+                ContentType = file.ContentType,
+                Size = file.Size,
+                Data = data,
+                PageCount = pages
+            };
+
+            activePageNum = 1;
+            jumpPageInput = 1;
+            signOptions.Fields.Clear();
+            selectedField = null;
+
+            // Place an initial Signature field on Page 1 and open the Signature Details Studio Modal (iLovePDF flow)
+            AddFieldToActivePage(SignFieldType.Signature);
+            isSignatureModalOpen = true;
+            shouldInitPdfStage = true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading {file.Name}: {ex.Message}";
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ResetFileAsync()
+    {
+        selectedFile = null;
+        signOptions.Fields.Clear();
+        selectedField = null;
+        lastResult = null;
+        errorMessage = null;
+        await JS.InvokeVoidAsync("mnshor.disposePdfPreview");
+    }
+
+    // =========================================================================
+    // Signature Studio Modal Logic
+    // =========================================================================
+
+    private async Task OpenSignatureModalAsync()
+    {
+        isSignatureModalOpen = true;
+        StateHasChanged();
+
+        if (modalInputMethod == SignatureInputMethod.DrawFreehand)
+        {
+            await Task.Delay(50);
+            await JS.InvokeVoidAsync("mnshor.initSignaturePad", "freehand-sig-canvas", modalInkColorHex, modalPenStrokeWidth);
+        }
+    }
+
+    private void CloseSignatureModal()
+    {
+        isSignatureModalOpen = false;
+    }
+
+    private async Task SwitchModalTabAsync(SignatureInputMethod method)
+    {
+        modalInputMethod = method;
+        StateHasChanged();
+
+        if (method == SignatureInputMethod.DrawFreehand)
+        {
+            await Task.Delay(50);
+            await JS.InvokeVoidAsync("mnshor.initSignaturePad", "freehand-sig-canvas", modalInkColorHex, modalPenStrokeWidth);
+        }
+    }
+
+    private void OnModalFullNameInput(ChangeEventArgs e)
+    {
+        string name = e.Value?.ToString() ?? string.Empty;
+        signOptions.SignerFullName = name;
+
+        // Auto-derive initials from Full Name
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+        {
+            bool isAr = OsFontService.ContainsArabic(name);
+            signOptions.SignerInitials = isAr
+                ? $"{parts[0][0]}.{parts[^1][0]}"
+                : $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[^1][0])}";
+        }
+        else if (parts.Length == 1 && parts[0].Length > 0)
+        {
+            signOptions.SignerInitials = parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant();
+        }
+    }
+
+    private IEnumerable<OsFontDescriptor> GetVisibleModalFonts()
+    {
+        if (activeFontCategoryTab == OsFontCategory.SignatureScript)
+        {
+            return signatureFontPresets;
+        }
+
+        if (activeFontCategoryTab == OsFontCategory.ArabicCalligraphy)
+        {
+            return arabicFontPresets;
+        }
+
+        var query = osFontSearchQuery?.Trim() ?? string.Empty;
+        var filtered = string.IsNullOrEmpty(query)
+            ? allInstalledOsFonts.Take(36)
+            : allInstalledOsFonts.Where(f => f.Contains(query, StringComparison.OrdinalIgnoreCase)).Take(36);
+
+        return filtered.Select(f => new OsFontDescriptor
+        {
+            FamilyName = f,
+            DisplayName = f,
+            Category = OsFontCategory.SystemFont
+        });
+    }
+
+    private string GetModalFontPreviewDataUrl(string fontFamily)
+    {
+        string sample = string.IsNullOrWhiteSpace(signOptions.SignerFullName) ? "Signature" : signOptions.SignerFullName;
+        var (png, _) = FontService.RenderTextSignatureToPng(
+            sample,
+            fontFamily,
+            modalInkColorHex,
+            fontSizePt: 36f,
+            isBold: false,
+            isItalic: false,
+            includeSignatureLine: modalIncludeUnderlineFlourish);
+
+        return $"data:image/png;base64,{Convert.ToBase64String(png)}";
+    }
+
+    private async Task UpdateDrawPadStyleAsync(string colorHex, float strokeWidth)
+    {
+        modalInkColorHex = colorHex;
+        modalPenStrokeWidth = strokeWidth;
+        await JS.InvokeVoidAsync("mnshor.updateSignaturePadStyle", modalInkColorHex, modalPenStrokeWidth);
+    }
+
+    private async Task OnPenWidthSliderInputAsync(ChangeEventArgs e)
+    {
+        if (float.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out float w))
+        {
+            await UpdateDrawPadStyleAsync(modalInkColorHex, w);
+        }
+    }
+
+    private async Task ClearDrawPadAsync()
+    {
+        await JS.InvokeVoidAsync("mnshor.clearSignaturePad", "freehand-sig-canvas");
+    }
+
+    private async Task OnSignatureImageUploadedAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            using var ms = new MemoryStream();
+            using var stream = e.File.OpenReadStream(maxAllowedSize: 25 * 1024 * 1024);
+            await stream.CopyToAsync(ms);
+            rawUploadedImageBytes = ms.ToArray();
+            ReprocessUploadedSignatureImage();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error reading image: {ex.Message}";
+        }
+    }
+
+    private void OnUploadOptionChanged(bool removeBg, bool tintInk)
+    {
+        uploadRemoveWhiteBg = removeBg;
+        uploadTintInk = tintInk;
+        ReprocessUploadedSignatureImage();
+    }
+
+    private void OnUploadColorSwatchClicked(string swatch)
+    {
+        modalInkColorHex = swatch;
+        if (uploadTintInk)
+        {
+            ReprocessUploadedSignatureImage();
+        }
+    }
+
+    private void ReprocessUploadedSignatureImage()
+    {
+        if (rawUploadedImageBytes == null || rawUploadedImageBytes.Length == 0)
+            return;
+
+        string? tint = uploadTintInk ? modalInkColorHex : null;
+        var (png, ratio) = FontService.ProcessUploadedSignatureImage(rawUploadedImageBytes, uploadRemoveWhiteBg, tint);
+        processedUploadPngBytes = png;
+        processedUploadAspect = ratio;
+    }
+
+    private void RefreshActiveTypedSignature()
+    {
+        var sigRes = FontService.RenderTextSignatureToPng(
+            signOptions.SignerFullName,
+            selectedModalOsFont,
+            modalInkColorHex,
+            fontSizePt: 46f,
+            isBold: false,
+            isItalic: false,
+            includeSignatureLine: modalIncludeUnderlineFlourish);
+
+        activeSignaturePngBytes = sigRes.PngBytes;
+        activeSignatureAspect = sigRes.AspectRatio;
+        activeSignaturePreviewUrl = $"data:image/png;base64,{Convert.ToBase64String(sigRes.PngBytes)}";
+        activeSignatureFontName = selectedModalOsFont;
+
+        var initRes = FontService.RenderTextSignatureToPng(
+            signOptions.SignerInitials,
+            selectedModalOsFont,
+            modalInkColorHex,
+            fontSizePt: 42f,
+            isBold: false,
+            isItalic: false,
+            includeSignatureLine: false);
+
+        activeInitialsPngBytes = initRes.PngBytes;
+        activeInitialsAspect = initRes.AspectRatio;
+    }
+
+    private async Task ApplySignatureModalAsync()
+    {
+        if (modalInputMethod == SignatureInputMethod.TypeOsFont)
+        {
+            RefreshActiveTypedSignature();
+        }
+        else if (modalInputMethod == SignatureInputMethod.DrawFreehand)
+        {
+            var exported = await JS.InvokeAsync<DrawnSignatureResult?>("mnshor.exportSignaturePadPng", "freehand-sig-canvas");
+            if (exported != null && !string.IsNullOrEmpty(exported.Base64))
+            {
+                activeSignaturePngBytes = Convert.FromBase64String(exported.Base64);
+                activeSignatureAspect = exported.AspectRatio > 0.1 ? exported.AspectRatio : 3.0;
+                activeSignaturePreviewUrl = $"data:image/png;base64,{exported.Base64}";
+                activeSignatureFontName = Loc.IsRtl ? "توقيع مرسوم باليد" : "Freehand Signature";
+            }
+        }
+        else if (modalInputMethod == SignatureInputMethod.UploadImage)
+        {
+            if (processedUploadPngBytes != null && processedUploadPngBytes.Length > 0)
+            {
+                activeSignaturePngBytes = processedUploadPngBytes;
+                activeSignatureAspect = processedUploadAspect;
+                activeSignaturePreviewUrl = $"data:image/png;base64,{Convert.ToBase64String(processedUploadPngBytes)}";
+                activeSignatureFontName = Loc.IsRtl ? "صورة توقيع مرفوعة" : "Uploaded Signature";
+            }
+        }
+
+        // Update any existing Signature or Initials fields on the document with the newly applied signature
+        foreach (var field in signOptions.Fields)
+        {
+            if (field.FieldType == SignFieldType.Signature && activeSignaturePngBytes != null)
+            {
+                field.RenderedPngBytes = activeSignaturePngBytes;
+                field.AspectRatio = activeSignatureAspect;
+                field.FontFamily = selectedModalOsFont;
+                field.TextColorHex = modalInkColorHex;
+                field.Text = modalInputMethod == SignatureInputMethod.TypeOsFont ? signOptions.SignerFullName : string.Empty;
+            }
+            else if (field.FieldType == SignFieldType.Initials && activeInitialsPngBytes != null)
+            {
+                field.RenderedPngBytes = activeInitialsPngBytes;
+                field.AspectRatio = activeInitialsAspect;
+                field.FontFamily = selectedModalOsFont;
+                field.TextColorHex = modalInkColorHex;
+                field.Text = signOptions.SignerInitials;
+            }
+        }
+
+        isSignatureModalOpen = false;
+    }
+
+    private sealed class DrawnSignatureResult
+    {
+        public string Base64 { get; set; } = string.Empty;
+        public double AspectRatio { get; set; } = 3.0;
+    }
+
+    // =========================================================================
+    // Placing, Dragging, Resizing & Editing Fields on the Page Stage
+    // =========================================================================
+
+    private void AddFieldToActivePage(SignFieldType type)
+    {
+        // Stagger slightly when adding multiple fields so they don't stack invisibly
+        int existingOnPage = GetFieldsVisibleOnPage(activePageNum).Count();
+        double offsetStep = (existingOnPage % 5) * 0.035;
+
+        var field = new PdfSignatureField
+        {
+            FieldType = type,
+            TargetPage = activePageNum,
+            PageScope = SignPageScope.SpecificPage,
+            XPercent = Math.Clamp(0.58 - offsetStep, 0.08, 0.75),
+            YPercent = Math.Clamp(0.74 - offsetStep, 0.08, 0.85),
+            TextColorHex = modalInkColorHex
+        };
+
+        switch (type)
+        {
+            case SignFieldType.Signature:
+                field.Text = modalInputMethod == SignatureInputMethod.TypeOsFont ? signOptions.SignerFullName : string.Empty;
+                field.FontFamily = selectedModalOsFont;
+                field.RenderedPngBytes = activeSignaturePngBytes;
+                field.AspectRatio = activeSignatureAspect;
+                field.WidthPercent = 0.26;
+                break;
+
+            case SignFieldType.Initials:
+                field.Text = signOptions.SignerInitials;
+                field.FontFamily = selectedModalOsFont;
+                field.RenderedPngBytes = activeInitialsPngBytes;
+                field.AspectRatio = activeInitialsAspect;
+                field.WidthPercent = 0.11;
+                break;
+
+            case SignFieldType.Name:
+                field.Text = signOptions.SignerFullName;
+                field.FontFamily = "Segoe UI";
+                field.IsBold = true;
+                field.WidthPercent = 0.22;
+                RebuildTextFieldImage(field);
+                break;
+
+            case SignFieldType.Date:
+                field.Text = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                field.FontFamily = "Segoe UI";
+                field.WidthPercent = 0.16;
+                RebuildTextFieldImage(field);
+                break;
+
+            case SignFieldType.CustomText:
+                field.Text = Loc.IsRtl ? "موافق ومعتمد" : "Approved & Verified";
+                field.FontFamily = "Segoe UI";
+                field.WidthPercent = 0.22;
+                RebuildTextFieldImage(field);
+                break;
+
+            case SignFieldType.Stamp:
+                string stampTitle = Loc.IsRtl ? "معتمد رسمياً" : "APPROVED";
+                string stampSub = $"{DateTime.Now:yyyy-MM-dd} • {signOptions.SignerInitials}";
+                field.Text = stampTitle;
+                field.FontFamily = "Segoe UI";
+                field.TextColorHex = "#1D4ED8";
+                var stampRes = FontService.RenderOfficialStampToPng(stampTitle, stampSub, field.FontFamily, field.TextColorHex);
+                field.RenderedPngBytes = stampRes.PngBytes;
+                field.AspectRatio = stampRes.AspectRatio;
+                field.WidthPercent = 0.24;
+                break;
+        }
+
+        signOptions.Fields.Add(field);
+        selectedField = field;
+    }
+
+    private void RebuildTextFieldImage(PdfSignatureField field)
+    {
+        if (field.FieldType == SignFieldType.Stamp)
+        {
+            string sub = $"{DateTime.Now:yyyy-MM-dd} • {signOptions.SignerInitials}";
+            var stampRes = FontService.RenderOfficialStampToPng(field.Text, sub, field.FontFamily, field.TextColorHex);
+            field.RenderedPngBytes = stampRes.PngBytes;
+            field.AspectRatio = stampRes.AspectRatio;
+            return;
+        }
+
+        var (png, ratio) = FontService.RenderTextSignatureToPng(
+            field.Text,
+            field.FontFamily,
+            field.TextColorHex,
+            fontSizePt: 44f,
+            isBold: field.IsBold,
+            isItalic: field.IsItalic,
+            includeSignatureLine: field.FieldType == SignFieldType.Signature && modalIncludeUnderlineFlourish);
+
+        field.RenderedPngBytes = png;
+        field.AspectRatio = ratio;
+    }
+
+    private IEnumerable<PdfSignatureField> GetFieldsVisibleOnPage(int pageNum)
+    {
+        int totalPages = selectedFile?.PageCount ?? 1;
+        foreach (var f in signOptions.Fields)
+        {
+            bool visible = f.PageScope switch
+            {
+                SignPageScope.AllPages => true,
+                SignPageScope.LastPage => pageNum == totalPages,
+                SignPageScope.CustomRange => IsPageInCustomRange(f.CustomRange, pageNum, totalPages),
+                _ => f.TargetPage == pageNum
+            };
+
+            if (visible)
+                yield return f;
+        }
+    }
+
+    private static bool IsPageInCustomRange(string? rangeExpr, int pageNum, int totalPages)
+    {
+        if (string.IsNullOrWhiteSpace(rangeExpr))
+            return false;
+
+        var parts = rangeExpr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var part in parts)
+        {
+            if (part.Contains('-'))
+            {
+                var bounds = part.Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (bounds.Length == 2 && int.TryParse(bounds[0], out int s) && int.TryParse(bounds[1], out int e))
+                {
+                    int min = Math.Min(s, e);
+                    int max = Math.Max(s, e);
+                    if (pageNum >= min && pageNum <= max && pageNum <= totalPages)
+                        return true;
+                }
+            }
+            else if (int.TryParse(part, out int single) && single == pageNum)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private async Task OnFieldPointerDownAsync(PointerEventArgs e, PdfSignatureField field, string domId)
+    {
+        selectedField = field;
+        await JS.InvokeVoidAsync(
+            "mnshor.startSignFieldDrag",
+            e.ClientX,
+            e.ClientY,
+            "sign-page-stage",
+            domId,
+            field.Id.ToString(),
+            field.XPercent,
+            field.YPercent,
+            dotNetRef);
+    }
+
+    [JSInvokable]
+    public void OnFieldDraggedFromJs(string fieldIdStr, double newXPct, double newYPct)
+    {
+        if (Guid.TryParse(fieldIdStr, out var id))
+        {
+            var field = signOptions.Fields.FirstOrDefault(f => f.Id == id);
+            if (field != null)
+            {
+                field.XPercent = Math.Clamp(newXPct, 0.0, 0.92);
+                field.YPercent = Math.Clamp(newYPct, 0.0, 0.94);
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void AdjustFieldWidth(PdfSignatureField field, double delta)
+    {
+        field.WidthPercent = Math.Clamp(field.WidthPercent + delta, 0.06, 0.65);
+    }
+
+    private void ToggleFieldAllPages(PdfSignatureField field)
+    {
+        field.PageScope = field.PageScope == SignPageScope.AllPages
+            ? SignPageScope.SpecificPage
+            : SignPageScope.AllPages;
+    }
+
+    private void DuplicateSelectedField(PdfSignatureField source)
+    {
+        var copy = new PdfSignatureField
+        {
+            FieldType = source.FieldType,
+            Text = source.Text,
+            FontFamily = source.FontFamily,
+            TextColorHex = source.TextColorHex,
+            IsBold = source.IsBold,
+            IsItalic = source.IsItalic,
+            RenderedPngBytes = source.RenderedPngBytes,
+            AspectRatio = source.AspectRatio,
+            WidthPercent = source.WidthPercent,
+            XPercent = Math.Clamp(source.XPercent + 0.04, 0.05, 0.85),
+            YPercent = Math.Clamp(source.YPercent + 0.04, 0.05, 0.88),
+            RotationDegrees = source.RotationDegrees,
+            OpacityPercent = source.OpacityPercent,
+            TargetPage = activePageNum,
+            PageScope = SignPageScope.SpecificPage
+        };
+
+        signOptions.Fields.Add(copy);
+        selectedField = copy;
+    }
+
+    private void RemoveField(PdfSignatureField field)
+    {
+        signOptions.Fields.Remove(field);
+        if (selectedField?.Id == field.Id)
+        {
+            selectedField = signOptions.Fields.LastOrDefault();
+        }
+    }
+
+    private void OnSelectedFieldTextChanged(PdfSignatureField field, string newText)
+    {
+        field.Text = newText;
+        RebuildTextFieldImage(field);
+    }
+
+    private void OnSelectedFieldFontChanged(PdfSignatureField field, string newFont)
+    {
+        field.FontFamily = newFont;
+        RebuildTextFieldImage(field);
+    }
+
+    private void OnSelectedFieldColorChanged(PdfSignatureField field, string colorHex)
+    {
+        field.TextColorHex = colorHex;
+        RebuildTextFieldImage(field);
+    }
+
+    private void ToggleSelectedFieldBold(PdfSignatureField field)
+    {
+        field.IsBold = !field.IsBold;
+        RebuildTextFieldImage(field);
+    }
+
+    private void ToggleSelectedFieldItalic(PdfSignatureField field)
+    {
+        field.IsItalic = !field.IsItalic;
+        RebuildTextFieldImage(field);
+    }
+
+    private void OnSelectedFieldSizeInput(PdfSignatureField field, string? pctStr)
+    {
+        if (int.TryParse(pctStr, out int pct))
+        {
+            field.WidthPercent = Math.Clamp(pct / 100.0, 0.06, 0.65);
+        }
+    }
+
+    // =========================================================================
+    // Page Navigation & Execution
+    // =========================================================================
+
+    private Task PrevPageAsync()
+    {
+        if (activePageNum > 1)
+        {
+            activePageNum--;
+            jumpPageInput = activePageNum;
+            shouldRenderActivePage = true;
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task NextPageAsync()
+    {
+        if (selectedFile != null && activePageNum < selectedFile.PageCount)
+        {
+            activePageNum++;
+            jumpPageInput = activePageNum;
+            shouldRenderActivePage = true;
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task JumpToPageAsync()
+    {
+        if (selectedFile != null)
+        {
+            activePageNum = Math.Clamp(jumpPageInput, 1, selectedFile.PageCount);
+            jumpPageInput = activePageNum;
+            shouldRenderActivePage = true;
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task ExecuteSignPdfAsync()
+    {
+        if (selectedFile == null || signOptions.Fields.Count == 0)
+            return;
+
+        errorMessage = null;
+        isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            lastResult = await PdfEngine.SignPdfAsync(selectedFile, signOptions);
+            if (lastResult.Success)
+            {
+                await DownloadResultAsync(lastResult);
+            }
+            else
+            {
+                errorMessage = lastResult.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DownloadAgainAsync()
+    {
+        if (lastResult != null && lastResult.Success)
+        {
+            await DownloadResultAsync(lastResult);
+        }
+    }
+
+    private async Task DownloadResultAsync(ExecutionResult result)
+    {
+        await JS.InvokeVoidAsync("mnshor.downloadFileFromByteArray", result.OutputFileName, result.ContentType, result.OutputData);
+    }
+
+    public void Dispose()
+    {
+        Loc.OnChange -= OnLanguageChanged;
+        dotNetRef?.Dispose();
+    }
+}
