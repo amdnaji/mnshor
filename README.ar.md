@@ -8,6 +8,7 @@
 
 [![CI](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml/badge.svg)](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/amdnaji/mnshor?include_prereleases&label=Release)](https://github.com/amdnaji/mnshor/releases)
+[![Version](https://img.shields.io/badge/Version-0.2.0--alpha-D4A359)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET 11.0](https://img.shields.io/badge/.NET-11.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Cross--Platform%20Web-0078D6)](#طريقة-التشغيل-والبناء-من-المصدر)
@@ -51,6 +52,7 @@
 | **6. محرر البيانات الوصفية ومنظف الخصوصية** | عرض وتعديل البيانات الوصفية لملف PDF أو مسحها بالكامل لحماية الخصوصية. | تعديل (العنوان، المؤلف، الموضوع، الكلمات المفتاحية، برنامج الإنشاء) أو استخدام **منظف الخصوصية الفوري** لحذف كافة البيانات المخفية وسجلات XMP بنقرة واحدة قبل مشاركة الملف. |
 | **7. إضافة علامة مائية إلى PDF** | ختم المستند بنص شفاف (مثل: `سري للغاية` / `مسودة`) أو شعار مصور. | دعم النصوص العربية والإنجليزية والصور (`PNG`/`JPG`/`WebP`)، معاينة حية، تحديد الموضع عبر شبكة 9 نقاط، **وضع الفسيفساء (التكرار الشبكي)**، التحكم بالشفافية والزاوية والطبقة (فوق/خلف المحتوى). |
 | **8. تحويل Word و Excel و Markdown إلى PDF** | تحويل ملفات `.docx` و `.xlsx` و `.md` إلى مستندات PDF منسقة وجاهزة للطباعة. | **Word (`.docx`)**: العناوين، الجداول، القوائم، التنسيقات، الصور، ودعم العربية.<br>**Excel (`.xlsx`)**: استعراض أوراق العمل، معاينة فورية، اتجاه أفقي/عمودي، أحجام ورق (`A4`/`A3`/`Letter`)، اتجاه أعمدة (`RTL`/`LTR`)، تكرار الترويسة، وتلوين الصفوف بالتناوب.<br>**Markdown (`.md`)**: محرر مباشر مع نماذج جاهزة بالعربية والإنجليزية، جداول، كتل برمجية، واقتباسات. |
+| **9. توقيع مستند PDF** | توقيع وختم ملفات PDF تفاعلياً في الذاكرة بخطوط النظام أو الرسم الحر أو رفع الأختام. | **الكتابة بخطوط النظام (`OS Fonts`)** العربية والإنجليزية مع خط زخرفي سفلي، **الرسم الحر** بالماوس أو القلم الرقمي، **رفع صورة أو ختم** مع توحيد لون الحبر، سحب وإفلات وتغيير حجم حقول **التوقيع** و**التاريخ** و**الختم الرسمي**، ومعاينة فائقة الدقة حتى 500 ميجابايت. |
 
 ---
 
@@ -126,7 +128,7 @@ dotnet tool install --global wix
 wix extension add -g WixToolset.UI.wixext
 
 # بناء ملف الـ MSI داخل مجلد ./dist/
-.\installer\build-msi.ps1 -Version 0.1.0 -Stage alpha
+.\installer\build-msi.ps1 -Version 0.2.0 -Stage alpha
 ```
 
 <div dir="rtl">

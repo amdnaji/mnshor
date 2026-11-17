@@ -697,6 +697,211 @@ public class FastPdfEngine : IPdfEngine
         });
     }
 
+    public async Task<ExecutionResult> SignPdfAsync(DocumentItem document, PdfSignOptions options)
+    {
+        if (document == null || document.Data == null || document.Data.Length == 0)
+        {
+            return ExecutionResult.Fail("Invalid or empty PDF document.");
+        }
+
+        if (options == null || options.Fields == null || options.Fields.Count == 0)
+        {
+            return ExecutionResult.Fail("Please place at least one signature, initial, or field on the document before signing.");
+        }
+
+        var sw = Stopwatch.StartNew();
+
+        return await Task.Run(() =>
+        {
+            try
+            {
+                using var inputStream = new MemoryStream(document.Data, writable: false);
+                using var doc = PdfReader.Open(inputStream, PdfDocumentOpenMode.Modify);
+                int totalPages = doc.PageCount;
+
+                if (totalPages == 0)
+                {
+                    return ExecutionResult.Fail("Document contains no pages.");
+                }
+
+                var osFontService = new OsFontService();
+                int totalStampsApplied = 0;
+                var pagesTouched = new HashSet<int>();
+
+                // Group stamp operations per page so we only open one XGraphics per page
+                var pageOperations = new Dictionary<int, List<(byte[] PngBytes, double AspectRatio, PdfSignatureField Field)>>();
+
+                foreach (var field in options.Fields)
+                {
+                    byte[]? pngBytes = field.RenderedPngBytes;
+                    double aspect = field.AspectRatio;
+
+                    if (pngBytes == null || pngBytes.Length == 0)
+                    {
+                        if (string.IsNullOrWhiteSpace(field.Text))
+                            continue;
+
+                        var rendered = osFontService.RenderTextSignatureToPng(
+                            field.Text,
+                            field.FontFamily,
+                            field.TextColorHex,
+                            fontSizePt: 44f,
+                            isBold: field.IsBold,
+                            isItalic: field.IsItalic);
+
+                        pngBytes = rendered.PngBytes;
+                        aspect = rendered.AspectRatio;
+                    }
+
+                    if (pngBytes == null || pngBytes.Length == 0)
+                        continue;
+
+                    // Apply opacity if < 100%
+                    int opacityPct = Math.Clamp(field.OpacityPercent, 15, 100);
+                    if (opacityPct < 100)
+                    {
+                        pngBytes = ApplyOpacityToPng(pngBytes, opacityPct, out double decodedAspect);
+                        if (aspect <= 0.05 && decodedAspect > 0.05)
+                        {
+                            aspect = decodedAspect;
+                        }
+                    }
+                    else if (aspect <= 0.05)
+                    {
+                        using var bmp = SKBitmap.Decode(pngBytes);
+                        if (bmp != null && bmp.Height > 0)
+                        {
+                            aspect = (double)bmp.Width / bmp.Height;
+                        }
+                        else
+                        {
+                            aspect = 3.0;
+                        }
+                    }
+
+                    var targetPages = ResolveSignFieldTargetPages(field, totalPages);
+                    foreach (int p in targetPages)
+                    {
+                        if (!pageOperations.TryGetValue(p, out var list))
+                        {
+                            list = new List<(byte[] PngBytes, double AspectRatio, PdfSignatureField Field)>();
+                            pageOperations[p] = list;
+                        }
+                        list.Add((pngBytes, aspect, field));
+                    }
+                }
+
+                if (pageOperations.Count == 0)
+                {
+                    return ExecutionResult.Fail("None of the placed signature fields targeted valid document pages.");
+                }
+
+                foreach (var (pageNum, ops) in pageOperations.OrderBy(k => k.Key))
+                {
+                    var page = doc.Pages[pageNum - 1];
+                    double pageW = page.Width.Point;
+                    double pageH = page.Height.Point;
+
+                    using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+
+                    foreach (var (pngBytes, aspect, field) in ops)
+                    {
+                        using var imgStream = new MemoryStream(pngBytes, writable: false);
+                        using var xImg = XImage.FromStream(imgStream);
+
+                        double wPct = Math.Clamp(field.WidthPercent, 0.04, 0.90);
+                        double drawW = pageW * wPct;
+                        double safeAspect = Math.Clamp(aspect, 0.15, 20.0);
+                        double drawH = drawW / safeAspect;
+
+                        double drawX = Math.Clamp(field.XPercent, 0.0, 0.98) * pageW;
+                        double drawY = Math.Clamp(field.YPercent, 0.0, 0.98) * pageH;
+
+                        // Keep stamp within page boundaries
+                        if (drawX + drawW > pageW) drawX = Math.Max(0, pageW - drawW);
+                        if (drawY + drawH > pageH) drawY = Math.Max(0, pageH - drawH);
+
+                        double cx = drawX + (drawW / 2.0);
+                        double cy = drawY + (drawH / 2.0);
+
+                        DrawSingleWatermarkAtCenter(gfx, xImg, cx, cy, drawW, drawH, field.RotationDegrees);
+                        totalStampsApplied++;
+                        pagesTouched.Add(pageNum);
+                    }
+                }
+
+                using var outStream = new MemoryStream();
+                doc.Save(outStream, false);
+                sw.Stop();
+
+                string originalBase = Path.GetFileNameWithoutExtension(document.FileName);
+                string fileName = $"{originalBase}_signed_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+                string summary = $"Signed {pagesTouched.Count} of {totalPages} page(s) ({totalStampsApplied} signature/field stamp(s)) in {sw.ElapsedMilliseconds} ms";
+
+                return ExecutionResult.Ok(outStream.ToArray(), fileName, summary, sw.ElapsedMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                return ExecutionResult.Fail($"Sign PDF error: {ex.Message}", sw.ElapsedMilliseconds);
+            }
+        });
+    }
+
+    private static List<int> ResolveSignFieldTargetPages(PdfSignatureField field, int totalPages)
+    {
+        var pages = new List<int>();
+        switch (field.PageScope)
+        {
+            case SignPageScope.AllPages:
+                for (int p = 1; p <= totalPages; p++) pages.Add(p);
+                break;
+
+            case SignPageScope.LastPage:
+                pages.Add(totalPages);
+                break;
+
+            case SignPageScope.CustomRange:
+                var parsed = ParsePageRange(field.CustomRange ?? string.Empty, totalPages);
+                pages.AddRange(parsed);
+                break;
+
+            case SignPageScope.SpecificPage:
+            default:
+                int target = Math.Clamp(field.TargetPage, 1, totalPages);
+                pages.Add(target);
+                break;
+        }
+        return pages;
+    }
+
+    private static byte[] ApplyOpacityToPng(byte[] pngBytes, int opacityPercent, out double aspectRatio)
+    {
+        aspectRatio = 3.0;
+        using var srcBmp = SKBitmap.Decode(pngBytes);
+        if (srcBmp == null || srcBmp.Width <= 0 || srcBmp.Height <= 0)
+            return pngBytes;
+
+        aspectRatio = (double)srcBmp.Width / srcBmp.Height;
+        byte alpha = (byte)Math.Clamp((int)Math.Round((opacityPercent / 100.0) * 255), 15, 255);
+
+        var info = new SKImageInfo(srcBmp.Width, srcBmp.Height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var surface = SKSurface.Create(info);
+        if (surface == null) return pngBytes;
+
+        surface.Canvas.Clear(SKColors.Transparent);
+        using var paint = new SKPaint
+        {
+            IsAntialias = true,
+            Color = new SKColor(255, 255, 255, alpha)
+        };
+        surface.Canvas.DrawBitmap(srcBmp, 0, 0, paint);
+
+        using var snapshot = surface.Snapshot();
+        using var encoded = snapshot.Encode(SKEncodedImageFormat.Png, 100);
+        return encoded.ToArray();
+    }
+
     private static void DrawSingleWatermarkAtCenter(XGraphics gfx, XImage image, double cx, double cy, double drawW, double drawH, int rotationDegrees)
     {
         var state = gfx.Save();

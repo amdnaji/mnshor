@@ -1522,6 +1522,7 @@ body {
 .tools-grid .tool-card:nth-child(7) { animation-delay: 0.30s; }
 .tools-grid .tool-card:nth-child(8) { animation-delay: 0.34s; }
 .tools-grid .tool-card:nth-child(9) { animation-delay: 0.38s; }
+.tools-grid .tool-card:nth-child(10) { animation-delay: 0.42s; }
 
 @media (prefers-reduced-motion: reduce) {
     .mnshor-logo-animated,
@@ -1533,3 +1534,334 @@ body {
         animation: none !important;
     }
 }
+
+/* ==========================================================================
+   Sign PDF (iLovePDF-Style Interactive Stage & OS Font Studio Modal)
+   ========================================================================== */
+.mnshor-container:has(.sign-workspace) {
+    max-width: 1280px;
+}
+
+.sign-workspace {
+    display: grid;
+    grid-template-columns: 1fr 375px;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 980px) {
+    .sign-workspace {
+        grid-template-columns: 1fr;
+    }
+}
+
+.sign-stage-wrapper {
+    background: #E2E8F0;
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 620px;
+    box-shadow: inset 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+.sign-page-viewport {
+    position: relative;
+    background: #FFFFFF;
+    box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.18), 0 4px 10px -3px rgba(15, 23, 42, 0.08);
+    border-radius: 4px;
+    max-width: 100%;
+    user-select: none;
+    overflow: hidden;
+}
+
+.sign-page-canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    pointer-events: none;
+}
+
+.sign-placed-field {
+    position: absolute;
+    border: 2px dashed rgba(37, 99, 235, 0.65);
+    background: rgba(239, 246, 255, 0.18);
+    border-radius: 6px;
+    cursor: grab;
+    padding: 4px 6px;
+    transition: box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    z-index: 10;
+    touch-action: none;
+}
+
+.sign-placed-field:hover {
+    border-color: var(--brand-primary);
+    background: rgba(239, 246, 255, 0.35);
+}
+
+.sign-placed-field.selected-field {
+    border: 2px solid var(--brand-primary);
+    background: rgba(239, 246, 255, 0.42);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22), var(--shadow-md);
+    z-index: 15;
+}
+
+.sign-placed-field:active {
+    cursor: grabbing;
+}
+
+.sign-placed-field img {
+    width: 100%;
+    height: auto;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+}
+
+.sign-field-floating-bar {
+    position: absolute;
+    top: -28px;
+    right: -2px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: var(--text-primary);
+    color: #FFFFFF;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: var(--shadow-sm);
+    z-index: 20;
+}
+
+.sign-field-mini-btn {
+    background: transparent;
+    border: none;
+    color: #FFFFFF;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+}
+
+.sign-field-mini-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.sign-field-mini-btn.danger:hover {
+    background: var(--danger);
+}
+
+/* Right Sidebar Field Palette */
+.sign-palette-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.55rem;
+}
+
+.sign-palette-btn {
+    background: var(--bg-page);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-family: inherit;
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sign-palette-btn:hover {
+    background: var(--brand-surface);
+    border-color: var(--brand-primary);
+    color: var(--brand-primary);
+    transform: translateY(-1px);
+}
+
+.sign-active-sig-box {
+    background: var(--bg-page);
+    border: 1.5px dashed var(--border-hover);
+    border-radius: 10px;
+    padding: 0.65rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.sign-active-sig-box img {
+    max-height: 54px;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+/* iLovePDF-Style Signature Details Modal */
+.sign-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.58);
+    backdrop-filter: blur(3px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+}
+
+.sign-modal-card {
+    background: var(--bg-surface);
+    border-radius: 16px;
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.28);
+    width: 100%;
+    max-width: 780px;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: mnshorBadgeIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sign-modal-header {
+    padding: 1.15rem 1.5rem;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-page);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sign-modal-body {
+    padding: 1.25rem 1.5rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+
+.sign-modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-page);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.sign-name-initials-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 640px) {
+    .sign-name-initials-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.os-font-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+    max-height: 270px;
+    overflow-y: auto;
+    padding: 0.25rem;
+}
+
+@media (max-width: 640px) {
+    .os-font-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.os-font-card {
+    background: var(--bg-page);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 0.65rem 0.85rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    transition: all 0.15s ease;
+}
+
+.os-font-card:hover {
+    border-color: var(--border-hover);
+    background: #FFFFFF;
+}
+
+.os-font-card.active {
+    border-color: var(--brand-primary);
+    background: var(--brand-surface);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.14);
+}
+
+.os-font-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.os-font-card-preview {
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #FFFFFF;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    padding: 4px 8px;
+    overflow: hidden;
+}
+
+.os-font-card-preview img {
+    max-height: 38px;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+.sig-pad-wrapper {
+    background: #FFFFFF;
+    border: 2px dashed var(--border-hover);
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.sig-pad-canvas {
+    width: 100%;
+    height: 210px;
+    cursor: crosshair;
+    touch-action: none;
+    display: block;
+}
+
+.sig-pad-baseline {
+    position: absolute;
+    bottom: 44px;
+    left: 8%;
+    right: 8%;
+    border-bottom: 1.5px dashed #CBD5E1;
+    pointer-events: none;
+}
+

@@ -12,78 +12,318 @@
             <h1 class="promo-heading">@(Loc.IsRtl ? "عرض الموشن جرافيكس التفاعلي" : "Mnshor Motion Graphics Showcase")</h1>
             <p class="promo-sub">@(Loc.IsRtl ? "عرض 16:9 ثنائي اللغة جاهز للمشاهدة أو التسجيل بوضع ملء الشاشة" : "Bilingual 16:9 interactive product reel — ready for preview or fullscreen recording")</p>
         </div>
-        <a href="/" class="btn-lang" style="text-decoration: none;">
-            @(Loc.IsRtl ? "← العودة للأدوات" : "← Back to Tools")
-        </a>
+
+        <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+            <div class="promo-reel-switcher" role="tablist" aria-label="Promo Reels">
+                <button type="button"
+                        class="promo-reel-tab @(_reelMode == PromoReel.Suite ? "active" : "")"
+                        @onclick="() => SwitchReel(PromoReel.Suite)">
+                    @(Loc.IsRtl ? "نظرة عامة" : "Suite Overview")
+                </button>
+                <button type="button"
+                        class="promo-reel-tab @(_reelMode == PromoReel.SignPdf ? "active" : "")"
+                        @onclick="() => SwitchReel(PromoReel.SignPdf)">
+                    @(Loc.IsRtl ? "محاكاة التوقيع (/sign)" : "Sign PDF (/sign)")
+                </button>
+            </div>
+
+            <a href="@(_reelMode == PromoReel.SignPdf ? "/sign" : "/")" class="btn-lang" style="text-decoration: none;">
+                @(_reelMode == PromoReel.SignPdf
+                    ? (Loc.IsRtl ? "← فتح أداة التوقيع" : "← Open /sign")
+                    : (Loc.IsRtl ? "← العودة للأدوات" : "← Back to Tools"))
+            </a>
+        </div>
     </div>
 
     <div id="promo-stage" class="promo-stage">
         <div class="promo-grid-bg"></div>
         <div class="promo-prism-beam"></div>
 
-        @if (_currentScene == 1)
+        @if (_reelMode == PromoReel.Suite)
         {
-            <div @key="1" class="promo-scene">
-                <span class="promo-kicker">@(Loc.IsRtl ? "الإصدار المحلي فائق السرعة" : "LOCAL-FIRST DOCUMENT SUITE")</span>
-                <MnshorLogo Size="112" Animated="true" />
-                <h2 class="promo-title-xl">@Loc["AppName"]</h2>
-                <p class="promo-lead">@Loc["AppTagline"]</p>
-            </div>
-        }
-        else if (_currentScene == 2)
-        {
-            <div @key="2" class="promo-scene">
-                <span class="promo-kicker">@(Loc.IsRtl ? "أمان وخصوصية بلا تنازلات" : "PRIVACY BY ARCHITECTURE")</span>
-                <div class="promo-privacy-ring">
-                    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                    </svg>
+            @if (_currentScene == 1)
+            {
+                <div @key="@("suite-1")" class="promo-scene">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "الإصدار المحلي فائق السرعة" : "LOCAL-FIRST DOCUMENT SUITE")</span>
+                    <MnshorLogo Size="112" Animated="true" />
+                    <h2 class="promo-title-xl">@Loc["AppName"]</h2>
+                    <p class="promo-lead">@Loc["AppTagline"]</p>
                 </div>
-                <h2 class="promo-title-xl">@(Loc.IsRtl ? "ملفاتك لا تغادر جهازك أبداً" : "Your Files Never Leave Your Device")</h2>
-                <div class="promo-pills-row">
-                    <span class="promo-chip">@(Loc.IsRtl ? "100% في الذاكرة" : "100% In-Memory")</span>
-                    <span class="promo-chip">@(Loc.IsRtl ? "بدون رفع سحابي" : "Zero Cloud Upload")</span>
-                    <span class="promo-chip">@(Loc.IsRtl ? "معالجة فورية" : "Instant Processing")</span>
+            }
+            else if (_currentScene == 2)
+            {
+                <div @key="@("suite-2")" class="promo-scene">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "أمان وخصوصية بلا تنازلات" : "PRIVACY BY ARCHITECTURE")</span>
+                    <div class="promo-privacy-ring">
+                        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                    </div>
+                    <h2 class="promo-title-xl">@(Loc.IsRtl ? "ملفاتك لا تغادر جهازك أبداً" : "Your Files Never Leave Your Device")</h2>
+                    <div class="promo-pills-row">
+                        <span class="promo-chip">@(Loc.IsRtl ? "100% في الذاكرة" : "100% In-Memory")</span>
+                        <span class="promo-chip">@(Loc.IsRtl ? "بدون رفع سحابي" : "Zero Cloud Upload")</span>
+                        <span class="promo-chip">@(Loc.IsRtl ? "معالجة فورية" : "Instant Processing")</span>
+                    </div>
                 </div>
-            </div>
-        }
-        else if (_currentScene == 3)
-        {
-            <div @key="3" class="promo-scene">
-                <span class="promo-kicker">@(Loc.IsRtl ? "تحكم كامل بملفات PDF" : "COMPLETE PDF TOOLKIT")</span>
-                <h2 class="promo-title-xl">@(Loc.IsRtl ? "كل أدوات PDF في مكان واحد" : "Every PDF Tool, Effortlessly Fast")</h2>
-                <div class="promo-cards-fan">
-                    <div class="promo-mini-card">@(Loc.IsRtl ? "دمج PDF" : "Merge")</div>
-                    <div class="promo-mini-card">@(Loc.IsRtl ? "تقسيم" : "Split")</div>
-                    <div class="promo-mini-card">@(Loc.IsRtl ? "تدوير وحذف" : "Rotate & Clean")</div>
-                    <div class="promo-mini-card">@(Loc.IsRtl ? "إعادة ترتيب" : "Reorder")</div>
-                    <div class="promo-mini-card">@(Loc.IsRtl ? "علامة مائية" : "Watermark")</div>
+            }
+            else if (_currentScene == 3)
+            {
+                <div @key="@("suite-3")" class="promo-scene">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "تحكم كامل بملفات PDF" : "COMPLETE PDF TOOLKIT")</span>
+                    <h2 class="promo-title-xl">@(Loc.IsRtl ? "كل أدوات PDF في مكان واحد" : "Every PDF Tool, Effortlessly Fast")</h2>
+                    <div class="promo-cards-fan">
+                        <div class="promo-mini-card">@(Loc.IsRtl ? "دمج PDF" : "Merge")</div>
+                        <div class="promo-mini-card">@(Loc.IsRtl ? "تقسيم" : "Split")</div>
+                        <div class="promo-mini-card">@(Loc.IsRtl ? "تدوير وحذف" : "Rotate & Clean")</div>
+                        <div class="promo-mini-card">@(Loc.IsRtl ? "إعادة ترتيب" : "Reorder")</div>
+                        <div class="promo-mini-card">@(Loc.IsRtl ? "علامة مائية" : "Watermark")</div>
+                    </div>
                 </div>
-            </div>
-        }
-        else if (_currentScene == 4)
-        {
-            <div @key="4" class="promo-scene">
-                <span class="promo-kicker">@(Loc.IsRtl ? "تحويل المستندات والبيانات" : "OFFICE & MARKDOWN ENGINE")</span>
-                <h2 class="promo-title-xl">@(Loc.IsRtl ? "من Word و Excel و Markdown إلى PDF" : "Word, Excel & Markdown to Crisp PDF")</h2>
-                <div class="promo-convert-flow">
-                    <div class="promo-format-box">DOCX</div>
-                    <div class="promo-format-box">XLSX</div>
-                    <div class="promo-format-box">Markdown</div>
-                    <span class="promo-prism-arrow">@(Loc.IsRtl ? "←" : "→")</span>
-                    <div class="promo-pdf-target">PDF</div>
+            }
+            else if (_currentScene == 4)
+            {
+                <div @key="@("suite-4")" class="promo-scene">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "تحويل المستندات والبيانات" : "OFFICE & MARKDOWN ENGINE")</span>
+                    <h2 class="promo-title-xl">@(Loc.IsRtl ? "من Word و Excel و Markdown إلى PDF" : "Word, Excel & Markdown to Crisp PDF")</h2>
+                    <div class="promo-convert-flow">
+                        <div class="promo-format-box">DOCX</div>
+                        <div class="promo-format-box">XLSX</div>
+                        <div class="promo-format-box">Markdown</div>
+                        <span class="promo-prism-arrow">@(Loc.IsRtl ? "←" : "→")</span>
+                        <div class="promo-pdf-target">PDF</div>
+                    </div>
                 </div>
-            </div>
+            }
+            else
+            {
+                <div @key="@("suite-5")" class="promo-scene">
+                    <MnshorLogo Size="96" Animated="true" />
+                    <h2 class="promo-title-xl">@(Loc.IsRtl ? "سريع. خاص. محلي." : "Fast. Private. Local.")</h2>
+                    <p class="promo-lead">@(Loc.IsRtl ? "مَنشُور — محطة معالجة المستندات والـ PDF" : "Mnshor — Local-First PDF & Document Suite")</p>
+                    <a href="/" class="promo-cta-btn">@(Loc.IsRtl ? "ابدأ الاستخدام الآن" : "Launch Mnshor Suite")</a>
+                </div>
+            }
         }
         else
         {
-            <div @key="5" class="promo-scene">
-                <MnshorLogo Size="96" Animated="true" />
-                <h2 class="promo-title-xl">@(Loc.IsRtl ? "سريع. خاص. محلي." : "Fast. Private. Local.")</h2>
-                <p class="promo-lead">@(Loc.IsRtl ? "مَنشُور — محطة معالجة المستندات والـ PDF" : "Mnshor — Local-First PDF & Document Suite")</p>
-                <a href="/" class="promo-cta-btn">@(Loc.IsRtl ? "ابدأ الاستخدام الآن" : "Launch Mnshor Suite")</a>
-            </div>
+            @* Sign PDF (/sign) 6-Scene Full Simulation using /demo/myFile.pdf *@
+            @if (_currentScene == 1)
+            {
+                <div @key="@("sign-1")" class="promo-scene">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "ميزة جديدة • /sign" : "NEW FEATURE • /sign")</span>
+                    <h2 class="promo-title-xl" style="margin-top: 0;">@(Loc.IsRtl ? "وقّع مستندات PDF في ثوانٍ" : "Sign & Stamp PDFs in Seconds")</h2>
+                    <div class="sim-dropzone" style="margin-top: 0.75rem;">
+                        <div class="sim-file-pill">
+                            <span>📄</span>
+                            <span>myFile.pdf (64 KB)</span>
+                        </div>
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                        <div style="font-weight: 700; color: #0F172A; font-size: 0.98rem;">@Loc["DragDropPrompt"]</div>
+                        <div style="font-size: 0.8rem; color: #475569;">@(Loc.IsRtl ? "خطوط النظام العربية والإنجليزية + رسم حر + ختم رسمي" : "OS Fonts (EN/AR) • Freehand Draw • Official Stamp")</div>
+                    </div>
+                </div>
+            }
+            else if (_currentScene == 2)
+            {
+                <div @key="@("sign-2")" class="promo-scene">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "عرض المستند محلياً بدقة عالية" : "LIVE HIGH-RES PDF WORKSPACE")</span>
+                    <div class="sim-workspace">
+                        <div class="sim-stage-col">
+                            <div class="sim-file-bar">
+                                <span>📄 myFile.pdf</span>
+                                <span class="sim-badge-green">@(Loc.IsRtl ? "في الذاكرة 100%" : "100% In-Memory")</span>
+                            </div>
+                            <div class="sim-pdf-frame">
+                                <canvas id="promo-sign-canvas-s2" class="sim-pdf-canvas"></canvas>
+                            </div>
+                        </div>
+                        <div class="sim-sidebar-col">
+                            <div class="sim-sidebar-title">@Loc["SigningToolkitTitle"]</div>
+                            <div class="sim-tool-btn highlight"><span>✍️ @Loc["AddSignatureField"]</span><span>+</span></div>
+                            <div class="sim-tool-btn"><span>📅 @Loc["AddDateField"]</span><span>+</span></div>
+                            <div class="sim-tool-btn"><span>🔖 @Loc["AddOfficialStampField"]</span><span>+</span></div>
+                            <div class="sim-sign-cta">@Loc["SignPdfButton"]</div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (_currentScene == 3)
+            {
+                <div @key="@("sign-3")" class="promo-scene">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "استوديو التوقيع المرن" : "CUSTOM SIGNATURE STUDIO")</span>
+                    <div class="sim-modal">
+                        <div style="font-weight: 700; font-size: 0.98rem; color: #0F172A;">@Loc["SetSignatureDetails"]</div>
+                        <div class="sim-modal-tabs">
+                            <div class="sim-modal-tab">@Loc["SignTabTypeOsFont"]</div>
+                            <div class="sim-modal-tab active">@Loc["SignTabDraw"]</div>
+                            <div class="sim-modal-tab">@Loc["SignTabUpload"]</div>
+                        </div>
+                        <div class="sim-draw-pad">
+                            <svg width="280" height="86" viewBox="0 0 280 86" fill="none">
+                                <path class="sim-stroke-path"
+                                      d="M 22 62 C 36 18, 56 14, 58 58 C 60 72, 78 24, 92 44 C 102 58, 114 26, 128 48 C 142 66, 162 28, 186 42 C 204 52, 224 38, 254 44"
+                                      stroke="#1D4ED8"
+                                      stroke-width="3.5"
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round" />
+                                <path class="sim-stroke-path"
+                                      style="animation-delay: 1.15s;"
+                                      d="M 32 74 Q 145 64 252 70"
+                                      stroke="#D4A359"
+                                      stroke-width="2"
+                                      stroke-linecap="round" />
+                            </svg>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; margin-top: 0.75rem;">
+                            <span class="sim-sign-cta" style="margin-top: 0; padding: 0.42rem 1.1rem;">@Loc["ApplySignatureModalBtn"]</span>
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (_currentScene == 4)
+            {
+                <div @key="@("sign-4")" class="promo-scene">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "سحب وإفلات التوقيع والتاريخ والختم" : "DRAG, PLACE & STAMP ON MYFILE.PDF")</span>
+                    <div class="sim-workspace">
+                        <div class="sim-stage-col">
+                            <div class="sim-file-bar">
+                                <span>📄 myFile.pdf</span>
+                                <span class="sim-badge-green">@(Loc.IsRtl ? "العناصر: 3" : "Fields: 3")</span>
+                            </div>
+                            <div class="sim-pdf-frame">
+                                <canvas id="promo-sign-canvas-s4" class="sim-pdf-canvas"></canvas>
+
+                                <div class="sim-placed-sig">
+                                    <svg width="96" height="32" viewBox="0 0 280 86" fill="none">
+                                        <path d="M 22 62 C 36 18, 56 14, 58 58 C 60 72, 78 24, 92 44 C 102 58, 114 26, 128 48 C 142 66, 162 28, 186 42 C 204 52, 224 38, 254 44"
+                                              stroke="#1D4ED8" stroke-width="4" stroke-linecap="round" />
+                                    </svg>
+                                </div>
+
+                                <div class="sim-placed-date">2026-11-17</div>
+
+                                <div class="sim-placed-stamp">@(Loc.IsRtl ? "معتمد" : "APPROVED")</div>
+                            </div>
+                        </div>
+                        <div class="sim-sidebar-col">
+                            <div class="sim-sidebar-title">@Loc["ActiveSignatureCardTitle"]</div>
+                            <div class="sim-tool-btn highlight"><span>✓ @Loc["AddSignatureField"]</span><span>1</span></div>
+                            <div class="sim-tool-btn highlight"><span>✓ @Loc["AddDateField"]</span><span>1</span></div>
+                            <div class="sim-tool-btn highlight"><span>✓ @Loc["AddOfficialStampField"]</span><span>1</span></div>
+                            <div class="sim-sign-cta">@Loc["SignPdfButton"]</div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (_currentScene == 5)
+            {
+                <div @key="@("sign-5")" class="promo-scene">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "حفظ فوري داخل الذاكرة" : "INSTANT IN-MEMORY EXPORT")</span>
+                    <div class="promo-privacy-ring">
+                        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </div>
+                    <h2 class="promo-title-xl">@(Loc.IsRtl ? "تم التوقيع والختم بنجاح!" : "Signed & Stamped Locally!")</h2>
+                    <div class="sim-download-card">
+                        <span style="font-size: 1.6rem;">📥</span>
+                        <div style="text-align: start;">
+                            <div style="font-weight: 700; color: #0F172A;">myFile_signed.pdf</div>
+                            <div style="font-size: 0.82rem; color: #059669; font-weight: 600;">@Loc["SignPdfSuccess"]</div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (_currentScene == 6)
+            {
+                <div @key="@("sign-6")" class="promo-scene">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "ملخص المميزات • /sign" : "ALL-IN-ONE SIGNING FEATURES • /sign")</span>
+                    <h2 class="promo-title-xl" style="font-size: clamp(1.45rem, 3vw, 2.2rem); margin-top: 0;">
+                        @(Loc.IsRtl ? "كل ما تحتاجه لتوقيع مستندات PDF" : "Everything You Need to Sign PDFs")
+                    </h2>
+                    <div class="sim-features-list">
+                        <div class="sim-feature-point">
+                            <span class="sim-feature-check">✓</span>
+                            <div class="sim-feature-text">
+                                @if (Loc.IsRtl)
+                                {
+                                    <strong>خطوط النظام (OS Fonts) العربية والإنجليزية:</strong><span> اكتب توقيعك بخطوط الرقعة والتوقيع مع خط زخرفي سفلي.</span>
+                                }
+                                else
+                                {
+                                    <strong>Arabic &amp; English OS Fonts:</strong><span> Type signatures in real system script fonts with optional flourish underline.</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="sim-feature-point">
+                            <span class="sim-feature-check">✓</span>
+                            <div class="sim-feature-text">
+                                @if (Loc.IsRtl)
+                                {
+                                    <strong>رسم حر + رفع صورة أو ختم:</strong><span> وقّع بالماوس أو القلم الرقمي أو ارفع صورة PNG/JPG مع توحيد لون الحبر.</span>
+                                }
+                                else
+                                {
+                                    <strong>Freehand Draw &amp; Image/Stamp Upload:</strong><span> Sketch with mouse/pen or upload PNG/JPG with automatic ink tinting.</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="sim-feature-point">
+                            <span class="sim-feature-check">✓</span>
+                            <div class="sim-feature-text">
+                                @if (Loc.IsRtl)
+                                {
+                                    <strong>عناصر متعددة وسحب وإفلات:</strong><span> أضف التوقيع والتاريخ والختم الرسمي وحرّكها وغيّر حجمها بحرية.</span>
+                                }
+                                else
+                                {
+                                    <strong>Interactive Multi-Field Placement:</strong><span> Drag, drop, and resize Signature, Date, and Official Stamp anywhere on the page.</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="sim-feature-point">
+                            <span class="sim-feature-check">✓</span>
+                            <div class="sim-feature-text">
+                                @if (Loc.IsRtl)
+                                {
+                                    <strong>دعم المستندات الكبيرة بدقة عالية:</strong><span> معاينة فائقة الوضوح مع تنقل سريع بين الصفحات (حتى 500 ميجابايت).</span>
+                                }
+                                else
+                                {
+                                    <strong>Large PDF Ready (Up to 500 MB):</strong><span> High-DPI page canvas with instant page jumping and smooth navigation.</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="sim-feature-point">
+                            <span class="sim-feature-check">✓</span>
+                            <div class="sim-feature-text">
+                                @if (Loc.IsRtl)
+                                {
+                                    <strong>خصوصية وأمان 100% في الذاكرة:</strong><span> تتم المعالجة بالكامل محلياً على جهازك بدون أي رفع سحابي.</span>
+                                }
+                                else
+                                {
+                                    <strong>100% In-Memory &amp; Zero Cloud Upload:</strong><span> Complete local processing on your device with instant PDF download.</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div @key="@("sign-7")" class="promo-scene">
+                    <MnshorLogo Size="96" Animated="true" />
+                    <h2 class="promo-title-xl">@(Loc.IsRtl ? "وقّع مستنداتك بخصوصية تامة" : "Sign PDFs with Total Privacy")</h2>
+                    <p class="promo-lead">@(Loc.IsRtl ? "خطوط النظام • رسم حر • ختم رسمي • محلي 100%" : "OS Fonts • Freehand Draw • Official Stamps • 100% Local")</p>
+                    <a href="/sign" class="promo-cta-btn">@(Loc.IsRtl ? "جرّب أداة التوقيع الآن" : "Try Sign PDF Now")</a>
+                </div>
+            }
         }
 
         <div class="promo-progress-track">
@@ -102,7 +342,7 @@
         </div>
 
         <div class="promo-scene-pills" aria-label="Scenes">
-            @for (int i = 1; i <= 5; i++)
+            @for (int i = 1; i <= SceneCount; i++)
             {
                 var sceneIndex = i;
                 <button type="button"
@@ -122,14 +362,20 @@
 </div>
 
 @code {
-    private const double TotalDurationSeconds = 22.0;
-    private static readonly double[] SceneStarts = [0.0, 4.0, 8.0, 13.0, 17.5];
+    private enum PromoReel { Suite, SignPdf }
 
+    private static readonly double[] SuiteSceneStarts = [0.0, 4.0, 8.0, 13.0, 17.5];
+    private static readonly double[] SignSceneStarts = [0.0, 4.0, 8.5, 13.5, 19.0, 22.5, 26.5];
+
+    private PromoReel _reelMode = PromoReel.SignPdf;
     private double _elapsedSeconds = 0.0;
     private int _currentScene = 1;
     private bool _isPlaying = true;
     private System.Timers.Timer? _timer;
+    private int _lastRenderedSignScene = 0;
 
+    private int SceneCount => _reelMode == PromoReel.Suite ? 5 : 7;
+    private double TotalDurationSeconds => _reelMode == PromoReel.Suite ? 22.0 : 30.0;
     private double ProgressPercent => Math.Clamp((_elapsedSeconds / TotalDurationSeconds) * 100.0, 0.0, 100.0);
 
     protected override void OnInitialized()
@@ -139,6 +385,27 @@
         _timer.Elapsed += OnTick;
         _timer.AutoReset = true;
         _timer.Start();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_reelMode == PromoReel.SignPdf && (_currentScene == 2 || _currentScene == 4))
+        {
+            if (_lastRenderedSignScene != _currentScene)
+            {
+                _lastRenderedSignScene = _currentScene;
+                var canvasId = _currentScene == 2 ? "promo-sign-canvas-s2" : "promo-sign-canvas-s4";
+                try
+                {
+                    await JS.InvokeVoidAsync("mnshor.renderPromoPdfPage", "/demo/myFile.pdf", canvasId);
+                }
+                catch (JSDisconnectedException) { }
+            }
+        }
+        else
+        {
+            _lastRenderedSignScene = 0;
+        }
     }
 
     private void OnLocChanged() => InvokeAsync(StateHasChanged);
@@ -157,13 +424,34 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
-    private static int ComputeScene(double t)
+    private int ComputeScene(double t)
     {
+        if (_reelMode == PromoReel.Suite)
+        {
+            if (t < 4.0) return 1;
+            if (t < 8.0) return 2;
+            if (t < 13.0) return 3;
+            if (t < 17.5) return 4;
+            return 5;
+        }
+
         if (t < 4.0) return 1;
-        if (t < 8.0) return 2;
-        if (t < 13.0) return 3;
-        if (t < 17.5) return 4;
-        return 5;
+        if (t < 8.5) return 2;
+        if (t < 13.5) return 3;
+        if (t < 19.0) return 4;
+        if (t < 22.5) return 5;
+        if (t < 26.5) return 6;
+        return 7;
+    }
+
+    private void SwitchReel(PromoReel mode)
+    {
+        if (_reelMode == mode) return;
+        _reelMode = mode;
+        _elapsedSeconds = 0.0;
+        _currentScene = 1;
+        _lastRenderedSignScene = 0;
+        _isPlaying = true;
     }
 
     private void TogglePlay() => _isPlaying = !_isPlaying;
@@ -172,19 +460,25 @@
     {
         _elapsedSeconds = 0.0;
         _currentScene = 1;
+        _lastRenderedSignScene = 0;
         _isPlaying = true;
     }
 
     private void JumpToScene(int scene)
     {
-        if (scene < 1 || scene > 5) return;
-        _elapsedSeconds = SceneStarts[scene - 1];
+        if (scene < 1 || scene > SceneCount) return;
+        var starts = _reelMode == PromoReel.Suite ? SuiteSceneStarts : SignSceneStarts;
+        _elapsedSeconds = starts[scene - 1];
         _currentScene = scene;
     }
 
     private async Task ToggleFullscreen()
     {
-        await JS.InvokeVoidAsync("mnshor.toggleFullscreen", "promo-stage");
+        try
+        {
+            await JS.InvokeVoidAsync("mnshor.toggleFullscreen", "promo-stage");
+        }
+        catch (JSDisconnectedException) { }
     }
 
     public void Dispose()

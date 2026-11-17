@@ -829,4 +829,203 @@ End of report.
         var emptyMdRes = await _excelMdConverter.ConvertMarkdownToPdfAsync("   \n  ", "Empty");
         Assert.False(emptyMdRes.Success);
     }
+
+    // =========================================================================
+    // Sign PDF (iLovePDF Style + Cross-Platform OS Fonts) Tests
+    // =========================================================================
+
+    [Fact]
+    public void OsFontService_DiscoversInstalledOsFontsAndRendersSignatures()
+    {
+        var fontService = new OsFontService();
+
+        var allOsFonts = fontService.GetInstalledFontFamilies();
+        var sigFonts = fontService.GetSignatureFonts();
+        var arabicFonts = fontService.GetArabicFonts();
+
+        Assert.NotEmpty(allOsFonts);
+        Assert.NotEmpty(sigFonts);
+        Assert.NotEmpty(arabicFonts);
+
+        // 1. Render Latin signature using first curated OS signature font
+        var (enPng, enRatio) = fontService.RenderTextSignatureToPng(
+            "Ahmed Al-Mansoor",
+            sigFonts[0].FamilyName,
+            "#1D4ED8",
+            fontSizePt: 44f,
+            includeSignatureLine: true);
+
+        Assert.NotEmpty(enPng);
+        Assert.True(enRatio > 0.5);
+
+        // 2. Render Arabic signature using first curated OS Arabic calligraphy font
+        var (arPng, arRatio) = fontService.RenderTextSignatureToPng(
+            "أحمد المنصور ✅",
+            arabicFonts[0].FamilyName,
+            "#0F172A",
+            fontSizePt: 44f,
+            includeSignatureLine: true);
+
+        Assert.NotEmpty(arPng);
+        Assert.True(arRatio > 0.5);
+
+        // 3. Render Official Stamp
+        var (stampPng, stampRatio) = fontService.RenderOfficialStampToPng("APPROVED", "2026-11-17 • AM", "Segoe UI", "#059669");
+        Assert.NotEmpty(stampPng);
+        Assert.True(stampRatio > 1.0);
+    }
+
+    [Fact]
+    public void OsFontService_RemoveWhiteBackground_CreatesTransparentSignature()
+    {
+        var fontService = new OsFontService();
+
+        // Synthesize a 160x80 white paper image with a dark signature line in the center
+        byte[] rawPaperScan;
+        using (var surface = SkiaSharp.SKSurface.Create(new SkiaSharp.SKImageInfo(160, 80)))
+        {
+            surface.Canvas.Clear(SkiaSharp.SKColors.White);
+            using var pen = new SkiaSharp.SKPaint
+            {
+                Color = new SkiaSharp.SKColor(20, 20, 20),
+                StrokeWidth = 5f,
+                IsAntialias = true,
+                Style = SkiaSharp.SKPaintStyle.Stroke
+            };
+            surface.Canvas.DrawLine(20, 40, 140, 40, pen);
+
+            using var snap = surface.Snapshot();
+            using var enc = snap.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+            rawPaperScan = enc.ToArray();
+        }
+
+        var (transparentPng, _) = fontService.ProcessUploadedSignatureImage(
+            rawPaperScan,
+            removeWhiteBackground: true,
+            tintColorHex: "#1D4ED8");
+
+        Assert.NotNull(transparentPng);
+        Assert.NotEmpty(transparentPng!);
+
+        using var decoded = SkiaSharp.SKBitmap.Decode(transparentPng);
+        Assert.NotNull(decoded);
+
+        // Corner pixel (0, 0) was white -> must now be transparent (Alpha == 0)
+        Assert.Equal(0, decoded.GetPixel(0, 0).Alpha);
+
+        // Center pixel (80, 40) had dark ink -> must remain opaque and tinted blue
+        var centerPixel = decoded.GetPixel(80, 40);
+        Assert.True(centerPixel.Alpha > 200);
+        Assert.True(centerPixel.Blue > centerPixel.Red);
+    }
+
+    [Fact]
+    public async Task FastPdfEngine_SignPdf_StampsTypedSignatureInitialsAndDateAcrossPages()
+    {
+        var doc = new DocumentItem { FileName = "Agreement.pdf", Data = CreateSamplePdf(4, "Agreement") };
+
+        var signOptions = new PdfSignOptions
+        {
+            SignerFullName = "Ahmed Al-Mansoor",
+            SignerInitials = "AM",
+            Fields = new List<PdfSignatureField>
+            {
+                // Initials on all 4 pages
+                new PdfSignatureField
+                {
+                    FieldType = SignFieldType.Initials,
+                    Text = "AM",
+                    FontFamily = "Segoe Script",
+                    TextColorHex = "#1D4ED8",
+                    XPercent = 0.82,
+                    YPercent = 0.88,
+                    WidthPercent = 0.10,
+                    PageScope = SignPageScope.AllPages
+                },
+                // Full Signature on Last Page only
+                new PdfSignatureField
+                {
+                    FieldType = SignFieldType.Signature,
+                    Text = "Ahmed Al-Mansoor",
+                    FontFamily = "Ink Free",
+                    TextColorHex = "#0F172A",
+                    XPercent = 0.55,
+                    YPercent = 0.75,
+                    WidthPercent = 0.28,
+                    PageScope = SignPageScope.LastPage
+                },
+                // Date on Page 1
+                new PdfSignatureField
+                {
+                    FieldType = SignFieldType.Date,
+                    Text = "2026-11-17",
+                    FontFamily = "Segoe UI",
+                    XPercent = 0.15,
+                    YPercent = 0.80,
+                    WidthPercent = 0.16,
+                    TargetPage = 1,
+                    PageScope = SignPageScope.SpecificPage
+                }
+            }
+        };
+
+        var result = await _pdfEngine.SignPdfAsync(doc, signOptions);
+        Assert.True(result.Success, result.ErrorMessage);
+        Assert.NotEmpty(result.OutputData);
+        Assert.True(result.OutputData.Length > doc.Data.Length);
+        Assert.Equal(4, _pdfEngine.GetPageCount(result.OutputData));
+        Assert.Contains("4 of 4", result.Summary);
+    }
+
+    [Fact]
+    public async Task FastPdfEngine_SignPdf_ArabicSignatureAndCustomRange_StampsAccurately()
+    {
+        var doc = new DocumentItem { FileName = "Contract_AR.pdf", Data = CreateSamplePdf(5, "Contract") };
+
+        var signOptions = new PdfSignOptions
+        {
+            SignerFullName = "أحمد المنصور",
+            SignerInitials = "أ.م",
+            Fields = new List<PdfSignatureField>
+            {
+                new PdfSignatureField
+                {
+                    FieldType = SignFieldType.Signature,
+                    Text = "أحمد المنصور",
+                    FontFamily = "Aldhabi",
+                    TextColorHex = "#1E3A8A",
+                    XPercent = 0.18,
+                    YPercent = 0.76,
+                    WidthPercent = 0.26,
+                    OpacityPercent = 85,
+                    RotationDegrees = -5,
+                    PageScope = SignPageScope.CustomRange,
+                    CustomRange = "1, 3, 5"
+                }
+            }
+        };
+
+        var result = await _pdfEngine.SignPdfAsync(doc, signOptions);
+        Assert.True(result.Success, result.ErrorMessage);
+        Assert.NotEmpty(result.OutputData);
+        Assert.Equal(5, _pdfEngine.GetPageCount(result.OutputData));
+        Assert.Contains("3 of 5", result.Summary);
+    }
+
+    [Fact]
+    public async Task FastPdfEngine_SignPdf_InvalidInputs_FailSafely()
+    {
+        var doc = new DocumentItem { FileName = "Sample.pdf", Data = CreateSamplePdf(2, "Sample") };
+
+        // 1. Empty fields list
+        var noFieldsRes = await _pdfEngine.SignPdfAsync(doc, new PdfSignOptions());
+        Assert.False(noFieldsRes.Success);
+
+        // 2. Empty document
+        var emptyDocRes = await _pdfEngine.SignPdfAsync(new DocumentItem { FileName = "Empty.pdf", Data = Array.Empty<byte>() }, new PdfSignOptions
+        {
+            Fields = new List<PdfSignatureField> { new PdfSignatureField { Text = "Test" } }
+        });
+        Assert.False(emptyDocRes.Success);
+    }
 }
