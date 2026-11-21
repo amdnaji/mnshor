@@ -1,0 +1,795 @@
+@page "/powerpoint-pdf"
+@page "/pptx-to-pdf"
+@page "/pdf-to-pptx"
+@rendermode InteractiveServer
+@inject LocalizationState Loc
+@inject IPowerPointConverter PowerPointConverter
+@inject IPdfEngine PdfEngine
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>@Loc["PowerPointPdfTitle"] - @Loc["AppName"]</PageTitle>
+
+<a href="/" class="back-link">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="@(Loc.IsRtl ? "transform: rotate(180deg);" : "")">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+    </svg>
+    <span>@Loc["BackToTools"]</span>
+</a>
+
+<div class="panel-card">
+    <div class="panel-header">
+        <div>
+            <h1 class="panel-title">@Loc["PowerPointPdfTitle"]</h1>
+            <p class="panel-desc">@Loc["PowerPointPdfDesc"]</p>
+        </div>
+    </div>
+
+    <!-- Bidirectional Mode Switcher -->
+    <div class="excel-md-mode-switcher">
+        <button type="button"
+                class="excel-md-mode-btn @(options.Mode == PowerPointConversionMode.PptxToPdf ? "active" : "")"
+                @onclick="() => SwitchMode(PowerPointConversionMode.PptxToPdf)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <span>@Loc["TabPptxToPdf"]</span>
+        </button>
+
+        <button type="button"
+                class="excel-md-mode-btn @(options.Mode == PowerPointConversionMode.PdfToPptx ? "active" : "")"
+                @onclick="() => SwitchMode(PowerPointConversionMode.PdfToPptx)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <rect x="8" y="12" width="8" height="5" rx="1"></rect>
+            </svg>
+            <span>@Loc["TabPdfToPptx"]</span>
+        </button>
+    </div>
+
+    @if (options.Mode == PowerPointConversionMode.PptxToPdf)
+    {
+        @if (isLoadingFile)
+        {
+            <div class="mnshor-loading-card">
+                <div class="mnshor-spinner"></div>
+                <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">@loadingFileName</div>
+                <div style="font-size: 0.88rem; color: var(--text-secondary);">@loadingStatusText</div>
+                <div class="mnshor-progress-wrap" style="max-width: 360px;">
+                    <div class="mnshor-progress-header">
+                        <span>@loadingStepText</span>
+                        <span>@loadingProgressPercent%</span>
+                    </div>
+                    <div class="mnshor-progress-track">
+                        <div class="mnshor-progress-fill" style="width: @(loadingProgressPercent)%;"></div>
+                    </div>
+                </div>
+            </div>
+        }
+        @if (selectedPptxFile == null)
+        {
+            <label class="smart-dropzone" style="@(isLoadingFile ? "display: none;" : "")">
+                <InputFile class="dropzone-input-overlay" OnChange="OnFileSelectedAsync" accept=".pptx,.pdf" />
+                <div class="dropzone-icon" style="color: #D97706; background: #FEF3C7;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </div>
+                <div class="dropzone-text">@Loc["SelectPptxPrompt"]</div>
+                <div class="dropzone-subtext">Microsoft PowerPoint (.pptx) — 100% Local OpenXML In-Memory Engine (Max 500 MB)</div>
+            </label>
+        }
+        else
+        {
+            <div class="excel-md-workspace">
+                <!-- Left Stage: Presentation File Card & Slide Inspector -->
+                <div class="watermark-main-stage">
+                    <div class="file-item" style="margin-bottom: 1rem;">
+                        <div class="file-info">
+                            <div class="file-icon" style="color: #D97706;">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="file-name">@selectedPptxFile.FileName</div>
+                                <div class="file-meta-badges">
+                                    <span class="file-badge">@selectedPptxFile.FormattedSize</span>
+                                    @if (presentationInfo != null)
+                                    {
+                                        <span class="file-badge badge-accent">
+                                            @presentationInfo.SlideCount @(Loc.IsRtl ? "شريحة" : "slides")
+                                        </span>
+                                        <span class="file-badge">
+                                            @((int)Math.Round(presentationInfo.SlideWidthPoints)) × @((int)Math.Round(presentationInfo.SlideHeightPoints)) pt
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn-lang" @onclick="ResetPptxFile" style="color: var(--danger); border-color: var(--danger-border); background: var(--danger-surface);">
+                            <span>@Loc["Remove"]</span>
+                        </button>
+                    </div>
+
+                    @if (presentationInfo != null && presentationInfo.Slides.Count > 0)
+                    {
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-secondary);">
+                                @Loc["SlidesFound"] (@options.SelectedSlideNumbers.Count / @presentationInfo.SlideCount)
+                            </span>
+                            <div style="display: flex; gap: 0.45rem;">
+                                <button type="button" class="wm-preset-chip" @onclick="SelectAllSlides">@Loc["SelectAll"]</button>
+                                <button type="button" class="wm-preset-chip" @onclick="ClearSlideSelection">@Loc["ClearSelection"]</button>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;">
+                            @foreach (var slide in presentationInfo.Slides)
+                            {
+                                bool isSelected = options.SelectedSlideNumbers.Contains(slide.SlideNumber);
+                                <div @key="slide.SlideNumber"
+                                     class="page-thumbnail-card clickable-card"
+                                     style="@(isSelected ? "border-color: var(--brand-primary); background: var(--brand-surface);" : "opacity: 0.65;")"
+                                     @onclick="() => ToggleSlideSelection(slide.SlideNumber, !isSelected)">
+                                    <div class="page-card-header">
+                                        <span class="page-index-pill">#@slide.SlideNumber</span>
+                                        <input type="checkbox"
+                                               checked="@isSelected"
+                                               style="width: 16px; height: 16px; accent-color: var(--brand-primary);"
+                                               @onclick:stopPropagation="true"
+                                               @onchange="(e) => ToggleSlideSelection(slide.SlideNumber, e.Value is bool b && b)" />
+                                    </div>
+
+                                    @if (!string.IsNullOrEmpty(slide.PreviewDataUrl))
+                                    {
+                                        <div style="width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-subtle); background: #FFFFFF; box-shadow: var(--shadow-sm);">
+                                            <img src="@slide.PreviewDataUrl" alt="Slide @slide.SlideNumber" style="width: 100%; height: auto; display: block;" />
+                                        </div>
+                                    }
+
+                                    <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" dir="auto">
+                                        @slide.Title
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(slide.PreviewSnippet))
+                                    {
+                                        <div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" dir="auto">
+                                            @slide.PreviewSnippet
+                                        </div>
+                                    }
+                                    <div class="file-meta-badges" style="margin-top: auto;">
+                                        @if (slide.ImageCount > 0)
+                                        {
+                                            <span class="file-badge">🖼️ @slide.ImageCount</span>
+                                        }
+                                        @if (slide.TableCount > 0)
+                                        {
+                                            <span class="file-badge">📊 @slide.TableCount</span>
+                                        }
+                                        @if (slide.HasSpeakerNotes)
+                                        {
+                                            <span class="file-badge badge-accent">📝 Notes</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <!-- Right Sidebar: PPTX -> PDF Options -->
+                <aside class="watermark-sidebar">
+                    <div class="watermark-sidebar-header">
+                        @Loc["PageSetupTitle"]
+                    </div>
+
+                    <div class="watermark-sidebar-body">
+                        <div class="wm-section" style="gap: 0.55rem;">
+                            <label class="mosaic-toggle-card @(options.IncludeSlideNumbers ? "active" : "")">
+                                <input type="checkbox" @bind="options.IncludeSlideNumbers" />
+                                <span style="font-size: 0.82rem; font-weight: 600;">@Loc["IncludeSlideNumbersToggle"]</span>
+                            </label>
+
+                            <label class="mosaic-toggle-card @(options.IncludeSpeakerNotes ? "active" : "")">
+                                <input type="checkbox" @bind="options.IncludeSpeakerNotes" />
+                                <span style="font-size: 0.82rem; font-weight: 600;">@Loc["IncludeSpeakerNotesToggle"]</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="watermark-sidebar-footer">
+                        <button type="button"
+                                class="btn-primary-action"
+                                disabled="@(isProcessing || options.SelectedSlideNumbers.Count == 0)"
+                                @onclick="ExecutePptxToPdfAsync">
+                            @if (isProcessing)
+                            {
+                                <span>@Loc["Processing"] (@convertProgressPercent%)</span>
+                            }
+                            else
+                            {
+                                <span>@Loc["ConvertPptxToPdfButton"]</span>
+                            }
+                        </button>
+                        @if (isProcessing)
+                        {
+                            <div class="mnshor-progress-wrap">
+                                <div class="mnshor-progress-header">
+                                    <span>@convertStatusText</span>
+                                    <span>@convertProgressPercent%</span>
+                                </div>
+                                <div class="mnshor-progress-track">
+                                    <div class="mnshor-progress-fill" style="width: @(convertProgressPercent)%;"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </aside>
+            </div>
+        }
+    }
+    else
+    {
+        <!-- PDF -> PowerPoint (.pptx) Mode -->
+        @if (isLoadingFile)
+        {
+            <div class="mnshor-loading-card">
+                <div class="mnshor-spinner"></div>
+                <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">@loadingFileName</div>
+                <div style="font-size: 0.88rem; color: var(--text-secondary);">@loadingStatusText</div>
+            </div>
+        }
+        @if (selectedPdfFile == null)
+        {
+            <label class="smart-dropzone" style="@(isLoadingFile ? "display: none;" : "")">
+                <InputFile class="dropzone-input-overlay" OnChange="OnFileSelectedAsync" accept=".pdf,.pptx" />
+                <div class="dropzone-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <rect x="8" y="12" width="8" height="5" rx="1"></rect>
+                    </svg>
+                </div>
+                <div class="dropzone-text">@Loc["SelectPdfForPptxPrompt"]</div>
+                <div class="dropzone-subtext">PDF files — High-DPI Local Render to PowerPoint (.pptx) (Max 500 MB)</div>
+            </label>
+        }
+        else
+        {
+            <div class="excel-md-workspace">
+                <div class="watermark-main-stage">
+                    <div class="file-item" style="margin-bottom: 1.25rem;">
+                        <div class="file-info">
+                            <div class="file-icon" style="color: var(--brand-primary);">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="file-name">@selectedPdfFile.FileName</div>
+                                <div class="file-meta-badges">
+                                    <span class="file-badge">@selectedPdfFile.FormattedSize</span>
+                                    <span class="file-badge badge-accent">
+                                        @selectedPdfFile.PageCount @Loc["PagesCount"]
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn-lang" @onclick="ResetPdfFile" style="color: var(--danger); border-color: var(--danger-border); background: var(--danger-surface);">
+                            <span>@Loc["Remove"]</span>
+                        </button>
+                    </div>
+
+                    <!-- Page Scope Selection -->
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <label class="radio-card @(options.PageScope == "all" ? "active" : "")">
+                            <input type="radio" name="pdfToPptxScope" checked="@(options.PageScope == "all")" @onchange='() => options.PageScope = "all"' />
+                            <div>
+                                <div style="font-weight: 700;">@Loc["ScopeAll"] (@selectedPdfFile.PageCount @Loc["PagesCount"])</div>
+                            </div>
+                        </label>
+
+                        <label class="radio-card @(options.PageScope == "range" ? "active" : "")">
+                            <input type="radio" name="pdfToPptxScope" checked="@(options.PageScope == "range")" @onchange='() => options.PageScope = "range"' />
+                            <div style="width: 100%;">
+                                <div style="font-weight: 700;">@Loc["ScopeCustom"]</div>
+                                @if (options.PageScope == "range")
+                                {
+                                    <input type="text"
+                                           class="compact-input"
+                                           style="width: 100%; margin-top: 0.5rem; padding: 0.45rem 0.65rem;"
+                                           placeholder="@Loc["RangePlaceholder"]"
+                                           @bind="options.CustomRange"
+                                           @bind:event="oninput" />
+                                }
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Right Sidebar: PDF -> PPTX Options -->
+                <aside class="watermark-sidebar">
+                    <div class="watermark-sidebar-header">
+                        @Loc["PageSetupTitle"]
+                    </div>
+
+                    <div class="watermark-sidebar-body">
+                        <div class="wm-section">
+                            <label class="wm-label">@Loc["SlideSizePresetLabel"]</label>
+                            <select class="compact-input" style="width: 100%; padding: 0.5rem;" @bind="options.SlideSizePreset">
+                                <option value="@PptxSlideSizePreset.MatchSource">@Loc["SlideSizeMatch"]</option>
+                                <option value="@PptxSlideSizePreset.Widescreen16x9">@Loc["SlideSize16x9"]</option>
+                                <option value="@PptxSlideSizePreset.Standard4x3">@Loc["SlideSize4x3"]</option>
+                            </select>
+                        </div>
+
+                        <div class="wm-section">
+                            <label class="wm-label">@Loc["RenderQualityLabel"]</label>
+                            <div class="layer-selector-grid">
+                                <button type="button"
+                                        class="layer-card @(Math.Abs(options.RenderScale - 2.0f) < 0.1f ? "active" : "")"
+                                        @onclick="() => options.RenderScale = 2.0f">
+                                    <span>@Loc["QualityStandard"]</span>
+                                </button>
+                                <button type="button"
+                                        class="layer-card @(options.RenderScale >= 2.8f ? "active" : "")"
+                                        @onclick="() => options.RenderScale = 3.0f">
+                                    <span>@Loc["QualityHigh"]</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="watermark-sidebar-footer">
+                        <button type="button"
+                                class="btn-primary-action"
+                                disabled="@isProcessing"
+                                @onclick="ExecutePdfToPptxAsync">
+                            @if (isProcessing)
+                            {
+                                <span>@(string.IsNullOrEmpty(pdfProgressText) ? Loc["Processing"] : pdfProgressText) (@convertProgressPercent%)</span>
+                            }
+                            else
+                            {
+                                <span>@Loc["ConvertPdfToPptxButton"]</span>
+                            }
+                        </button>
+                        @if (isProcessing)
+                        {
+                            <div class="mnshor-progress-wrap">
+                                <div class="mnshor-progress-header">
+                                    <span>@convertStatusText</span>
+                                    <span>@convertProgressPercent%</span>
+                                </div>
+                                <div class="mnshor-progress-track">
+                                    <div class="mnshor-progress-fill" style="width: @(convertProgressPercent)%;"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </aside>
+            </div>
+        }
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="margin-top: 1.25rem; padding: 0.85rem 1.25rem; background: var(--danger-surface); border: 1px solid var(--danger-border); border-radius: 8px; color: var(--danger); font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span>@errorMessage</span>
+        </div>
+    }
+
+    @if (lastResult != null && lastResult.Success)
+    {
+        <div class="telemetry-card">
+            <div class="telemetry-header">
+                <span style="display: flex; align-items: center; gap: 0.4rem;">
+                    <span>✓ @Loc["PowerPointPdfSuccess"]</span>
+                </span>
+                <span class="telemetry-speed">⚡ @lastResult.ElapsedMilliseconds @Loc["Milliseconds"]</span>
+            </div>
+            <div class="telemetry-summary">@lastResult.Summary</div>
+            <div class="telemetry-note">@Loc["ZeroDiskIoNotice"]</div>
+            <div style="margin-top: 0.35rem;">
+                <button type="button" class="btn-primary-action" style="padding: 0.65rem 1.5rem; font-size: 0.92rem; width: auto;" @onclick="DownloadAgainAsync">
+                    <span>@Loc["DownloadResult"] (@lastResult.OutputFileName)</span>
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private PowerPointPdfOptions options = new();
+    private DocumentItem? selectedPptxFile;
+    private PptxPresentationInfo? presentationInfo;
+    private DocumentItem? selectedPdfFile;
+
+    private bool isLoadingFile = false;
+    private string loadingFileName = string.Empty;
+    private string loadingStatusText = string.Empty;
+    private string loadingStepText = string.Empty;
+    private int loadingProgressPercent = 0;
+
+    private bool isProcessing = false;
+    private string? pdfProgressText;
+    private string convertStatusText = string.Empty;
+    private int convertProgressPercent = 0;
+    private string? errorMessage;
+    private ExecutionResult? lastResult;
+
+    protected override void OnInitialized()
+    {
+        Loc.OnChange += StateHasChanged;
+        if (Nav.Uri.EndsWith("/pdf-to-pptx", StringComparison.OrdinalIgnoreCase))
+        {
+            options.Mode = PowerPointConversionMode.PdfToPptx;
+        }
+    }
+
+    private void SwitchMode(PowerPointConversionMode mode)
+    {
+        options.Mode = mode;
+        errorMessage = null;
+        lastResult = null;
+    }
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        lastResult = null;
+        var file = e.File;
+
+        isLoadingFile = true;
+        loadingFileName = file.Name;
+        loadingProgressPercent = 5;
+        loadingStepText = string.Empty;
+        loadingStatusText = file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
+            ? Loc["LoadingPdfFile"]
+            : Loc["LoadingPptxSlides"];
+        StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            using var ms = new MemoryStream();
+            using var stream = file.OpenReadStream(maxAllowedSize: 500 * 1024 * 1024);
+            await stream.CopyToAsync(ms);
+            var data = ms.ToArray();
+
+            if (file.Name.EndsWith(".pptx", StringComparison.OrdinalIgnoreCase))
+            {
+                options.Mode = PowerPointConversionMode.PptxToPdf;
+                loadingProgressPercent = 15;
+                StateHasChanged();
+
+                var progress = new Progress<(int Current, int Total)>(p =>
+                {
+                    _ = InvokeAsync(() =>
+                    {
+                        if (!isLoadingFile) return;
+                        int pct = p.Total > 0 ? 15 + (int)Math.Round((p.Current / (double)p.Total) * 85.0) : 50;
+                        loadingProgressPercent = Math.Clamp(pct, 15, 100);
+                        loadingStepText = $"{p.Current} / {p.Total}";
+                        StateHasChanged();
+                    });
+                });
+
+                var info = await Task.Run(() => PowerPointConverter.InspectPresentation(data, progress));
+                if (!info.IsValid)
+                {
+                    errorMessage = info.ErrorMessage;
+                    return;
+                }
+
+                selectedPptxFile = new DocumentItem
+                {
+                    FileName = file.Name,
+                    ContentType = file.ContentType,
+                    Size = file.Size,
+                    Data = data
+                };
+                presentationInfo = info;
+                SelectAllSlides();
+            }
+            else if (file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                options.Mode = PowerPointConversionMode.PdfToPptx;
+                int pages = await Task.Run(() => PdfEngine.GetPageCount(data));
+                if (pages <= 0)
+                {
+                    errorMessage = "Could not read pages from the selected PDF file.";
+                    return;
+                }
+
+                selectedPdfFile = new DocumentItem
+                {
+                    FileName = file.Name,
+                    ContentType = file.ContentType,
+                    Size = file.Size,
+                    Data = data,
+                    PageCount = pages
+                };
+            }
+            else
+            {
+                errorMessage = "Please select a valid PowerPoint (.pptx) or PDF (.pdf) file.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading {file.Name}: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingFile = false;
+            loadingProgressPercent = 0;
+            loadingStepText = string.Empty;
+        }
+    }
+
+    private void SelectAllSlides()
+    {
+        if (presentationInfo == null) return;
+        options.SelectedSlideNumbers = presentationInfo.Slides.Select(s => s.SlideNumber).ToHashSet();
+    }
+
+    private void ClearSlideSelection()
+    {
+        options.SelectedSlideNumbers.Clear();
+    }
+
+    private void ToggleSlideSelection(int slideNum, bool selected)
+    {
+        if (selected) options.SelectedSlideNumbers.Add(slideNum);
+        else options.SelectedSlideNumbers.Remove(slideNum);
+    }
+
+    private void ResetPptxFile()
+    {
+        selectedPptxFile = null;
+        presentationInfo = null;
+        options.SelectedSlideNumbers.Clear();
+        lastResult = null;
+        errorMessage = null;
+    }
+
+    private void ResetPdfFile()
+    {
+        selectedPdfFile = null;
+        lastResult = null;
+        errorMessage = null;
+    }
+
+    private async Task ExecutePptxToPdfAsync()
+    {
+        if (selectedPptxFile == null) return;
+
+        errorMessage = null;
+        isProcessing = true;
+        convertProgressPercent = 5;
+        convertStatusText = Loc["StagePreparingSlides"];
+        StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            var progress = new Progress<(int Current, int Total, string Stage)>(p =>
+            {
+                _ = InvokeAsync(() =>
+                {
+                    if (!isProcessing) return;
+                    if (p.Stage == "preparing")
+                    {
+                        int pct = p.Total > 0 ? 5 + (int)Math.Round((p.Current / (double)p.Total) * 55.0) : 30;
+                        convertProgressPercent = Math.Clamp(pct, 5, 60);
+                        convertStatusText = $"{Loc["StagePreparingSlides"]} ({p.Current}/{p.Total})";
+                    }
+                    else if (p.Stage == "rendering")
+                    {
+                        convertProgressPercent = 75;
+                        convertStatusText = Loc["StageRenderingPdf"];
+                    }
+                    else if (p.Stage == "optimizing")
+                    {
+                        convertProgressPercent = 90;
+                        convertStatusText = Loc["StageOptimizingPdf"];
+                    }
+                    StateHasChanged();
+                });
+            });
+
+            lastResult = await PowerPointConverter.ConvertPptxToPdfAsync(selectedPptxFile, options, progress);
+            if (lastResult.Success)
+            {
+                convertProgressPercent = 100;
+                StateHasChanged();
+                await DownloadResultAsync(lastResult);
+            }
+            else
+            {
+                errorMessage = lastResult.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+            convertProgressPercent = 0;
+            convertStatusText = string.Empty;
+        }
+    }
+
+    private async Task ExecutePdfToPptxAsync()
+    {
+        if (selectedPdfFile == null) return;
+
+        errorMessage = null;
+        isProcessing = true;
+        pdfProgressText = null;
+        convertProgressPercent = 2;
+        convertStatusText = Loc["StageRenderingPages"];
+        StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            var pageNums = ResolveTargetPdfPages(selectedPdfFile.PageCount);
+            if (pageNums.Count == 0)
+            {
+                errorMessage = Loc["InvalidRange"];
+                return;
+            }
+
+            await JS.InvokeAsync<int>("mnshor.openPdfForPptx", selectedPdfFile.Data);
+
+            var slideInputs = new List<PdfPageSlideImage>(pageNums.Count);
+            for (int i = 0; i < pageNums.Count; i++)
+            {
+                int pageNum = pageNums[i];
+                pdfProgressText = $"{i + 1} / {pageNums.Count}";
+                convertStatusText = $"{Loc["StageRenderingPages"]} ({i + 1}/{pageNums.Count})";
+                convertProgressPercent = Math.Clamp(5 + (int)Math.Round(((i + 1) / (double)pageNums.Count) * 75.0), 5, 80);
+                StateHasChanged();
+
+                var rendered = await JS.InvokeAsync<JsRenderedSlideDto?>(
+                    "mnshor.renderSinglePdfPageForPptx",
+                    pageNum,
+                    options.RenderScale);
+
+                if (rendered != null && !string.IsNullOrEmpty(rendered.ImageBase64))
+                {
+                    slideInputs.Add(new PdfPageSlideImage
+                    {
+                        PageNumber = rendered.PageNumber,
+                        WidthPoints = rendered.WidthPoints,
+                        HeightPoints = rendered.HeightPoints,
+                        ImageBytes = Convert.FromBase64String(rendered.ImageBase64)
+                    });
+                }
+            }
+
+            pdfProgressText = Loc["Processing"];
+            convertStatusText = Loc["StagePackagingPptx"];
+            convertProgressPercent = 85;
+            StateHasChanged();
+
+            var progress = new Progress<(int Current, int Total, string Stage)>(p =>
+            {
+                _ = InvokeAsync(() =>
+                {
+                    if (!isProcessing) return;
+                    int pct = p.Total > 0 ? 85 + (int)Math.Round((p.Current / (double)p.Total) * 14.0) : 92;
+                    convertProgressPercent = Math.Clamp(pct, 85, 99);
+                    StateHasChanged();
+                });
+            });
+
+            lastResult = await PowerPointConverter.ConvertSlidesToPptxAsync(selectedPdfFile.FileName, slideInputs, options, progress);
+            if (lastResult.Success)
+            {
+                convertProgressPercent = 100;
+                StateHasChanged();
+                await DownloadResultAsync(lastResult);
+            }
+            else
+            {
+                errorMessage = lastResult.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            try { await JS.InvokeVoidAsync("mnshor.closePdfForPptx"); } catch { }
+            pdfProgressText = null;
+            convertProgressPercent = 0;
+            convertStatusText = string.Empty;
+            isProcessing = false;
+        }
+    }
+
+    private List<int> ResolveTargetPdfPages(int totalPages)
+    {
+        if (options.PageScope != "range")
+        {
+            return Enumerable.Range(1, totalPages).ToList();
+        }
+
+        var result = new List<int>();
+        if (string.IsNullOrWhiteSpace(options.CustomRange)) return result;
+
+        foreach (var part in options.CustomRange.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (part.Contains('-'))
+            {
+                var bounds = part.Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (bounds.Length == 2 && int.TryParse(bounds[0], out int s) && int.TryParse(bounds[1], out int e))
+                {
+                    int step = s <= e ? 1 : -1;
+                    for (int p = s; s <= e ? p <= e : p >= e; p += step)
+                    {
+                        if (p >= 1 && p <= totalPages && !result.Contains(p))
+                            result.Add(p);
+                    }
+                }
+            }
+            else if (int.TryParse(part, out int single) && single >= 1 && single <= totalPages && !result.Contains(single))
+            {
+                result.Add(single);
+            }
+        }
+
+        return result;
+    }
+
+    private sealed class JsRenderedSlideDto
+    {
+        public int PageNumber { get; set; }
+        public double WidthPoints { get; set; }
+        public double HeightPoints { get; set; }
+        public string ImageBase64 { get; set; } = string.Empty;
+    }
+
+    private async Task DownloadAgainAsync()
+    {
+        if (lastResult != null && lastResult.Success)
+        {
+            await DownloadResultAsync(lastResult);
+        }
+    }
+
+    private async Task DownloadResultAsync(ExecutionResult result)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("mnshor.downloadFileFromByteArray", result.OutputFileName, result.ContentType, result.OutputData);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    public void Dispose()
+    {
+        Loc.OnChange -= StateHasChanged;
+    }
+}

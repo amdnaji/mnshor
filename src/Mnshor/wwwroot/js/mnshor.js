@@ -475,3 +475,100 @@ window.mnshor.startSignFieldDrag = function (clientX, clientY, stageId, fieldDom
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
 };
+
+// =========================================================================
+// PowerPoint (.pptx) <-> PDF: Render PDF Pages for PPTX Export via PDF.js
+// =========================================================================
+window.mnshor._pptxPdfTask = null;
+window.mnshor._pptxPdfDoc = null;
+
+window.mnshor._ensurePdfJsReady = async function () {
+    if (!window.pdfjsLib) {
+        const ready = await new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(false), 10000);
+            window.addEventListener('mnshor-pdfjs-ready', () => {
+                clearTimeout(timeout);
+                resolve(!!window.pdfjsLib);
+            }, { once: true });
+        });
+        if (!ready) throw new Error('PDF.js library is not loaded');
+    }
+
+    if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/pdf.worker.min.mjs';
+    }
+};
+
+window.mnshor.openPdfForPptx = async function (byteArray) {
+    await window.mnshor.closePdfForPptx();
+    await window.mnshor._ensurePdfJsReady();
+
+    const uint8 = new Uint8Array(byteArray);
+    const loadingTask = window.pdfjsLib.getDocument({
+        data: uint8,
+        wasmUrl: window.mnshor.pdfWasmUrl || '/js/pdfjs/wasm/'
+    });
+    window.mnshor._pptxPdfTask = loadingTask;
+    window.mnshor._pptxPdfDoc = await loadingTask.promise;
+    return window.mnshor._pptxPdfDoc.numPages;
+};
+
+window.mnshor.renderSinglePdfPageForPptx = async function (pageNum, scale) {
+    const pdfDoc = window.mnshor._pptxPdfDoc;
+    if (!pdfDoc) throw new Error('PDF document is not open');
+    if (pageNum < 1 || pageNum > pdfDoc.numPages) return null;
+
+    const renderScale = scale && scale > 0 ? scale : 2.0;
+    const page = await pdfDoc.getPage(pageNum);
+    const baseViewport = page.getViewport({ scale: 1.0 });
+    const viewport = page.getViewport({ scale: renderScale });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    const ctx = canvas.getContext('2d');
+
+    // Fill white background before rendering so transparent PDF pages don't turn black in JPEG
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    await page.render({
+        canvas: canvas,
+        canvasContext: ctx,
+        viewport: viewport
+    }).promise;
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    const base64 = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
+
+    return {
+        pageNumber: pageNum,
+        widthPoints: baseViewport.width,
+        heightPoints: baseViewport.height,
+        imageBase64: base64
+    };
+};
+
+window.mnshor.closePdfForPptx = async function () {
+    const task = window.mnshor._pptxPdfTask;
+    window.mnshor._pptxPdfTask = null;
+    window.mnshor._pptxPdfDoc = null;
+    if (task && typeof task.destroy === 'function') {
+        try { await task.destroy(); } catch { }
+    }
+};
+
+window.mnshor.renderPdfPagesForPptx = async function (byteArray, pageNumbers, scale) {
+    const results = [];
+    try {
+        const numPages = await window.mnshor.openPdfForPptx(byteArray);
+        for (const pageNum of pageNumbers) {
+            if (pageNum < 1 || pageNum > numPages) continue;
+            const item = await window.mnshor.renderSinglePdfPageForPptx(pageNum, scale);
+            if (item) results.push(item);
+        }
+    } finally {
+        await window.mnshor.closePdfForPptx();
+    }
+    return results;
+};

@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml/badge.svg)](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/amdnaji/mnshor?include_prereleases&label=Release)](https://github.com/amdnaji/mnshor/releases)
-[![Version](https://img.shields.io/badge/Version-0.2.0--alpha-D4A359)](#)
+[![Version](https://img.shields.io/badge/Version-0.3.0--alpha-D4A359)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET 11.0](https://img.shields.io/badge/.NET-11.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Cross--Platform%20Web-0078D6)](#getting-started)
@@ -22,7 +22,7 @@
 
 ## Overview
 
-**Mnshor (مَنشُور)** is a fast, privacy-first PDF and document processing suite engineered to run **100% locally on your machine**. Every document operation—merging, splitting, rotating, watermarking, stripping metadata, or converting Word (`.docx`), Excel (`.xlsx`), and Markdown (`.md`) files to PDF—executes **entirely in RAM (`MemoryStream`)** with **zero cloud uploads** and **zero temporary disk writes**.
+**Mnshor (مَنشُور)** is a fast, privacy-first PDF and document processing suite engineered to run **100% locally on your machine**. Every document operation—merging, splitting, rotating, watermarking, signing, stripping metadata, or converting Word (`.docx`), Excel (`.xlsx`), Markdown (`.md`), and PowerPoint (`.pptx`) files to and from PDF—executes **entirely in RAM (`MemoryStream`)** with **zero cloud uploads** and **zero temporary disk writes**.
 
 On Windows, Mnshor can run either as a lightweight background Windows Service (`MnshorService` bound strictly to `http://127.0.0.1:5157`) paired with an instant desktop launcher (`Mnshor.Launcher.exe`), or directly as a self-hosted .NET 11 web application.
 
@@ -51,6 +51,7 @@ On Windows, Mnshor can run either as a lightweight background Windows Service (`
 | **7. Watermark PDF** | Stamp text or image logos across PDF pages with live preview. | Text & image watermarks, Arabic shaping, 9-grid positioning, **Mosaic Tiling**, opacity, custom rotation, Over/Below content layer, page range targeting. |
 | **8. Word, Excel & Markdown to PDF** | Convert `.docx`, `.xlsx`, and `.md` files into print-ready PDFs in RAM. | **Word (`.docx`)**: Headings, tables, lists, inline styling, images, RTL/LTR.<br>**Excel (`.xlsx`)**: Multi-sheet selector, live preview, Landscape/Portrait, A4/A3/Letter, RTL/LTR column flow, repeating headers, zebra striping, gridlines.<br>**Markdown (`.md`) Studio**: Live editor with English & Arabic sample templates, tables, code blocks, blockquotes, and auto-direction. |
 | **9. Sign PDF Document** | Sign and stamp PDFs interactively in memory with OS fonts, freehand drawing, or image stamps. | **Type (OS Fonts)** with Arabic & English script fonts and flourish underline, **Draw Freehand** canvas, **Upload Image/Stamp** with ink tinting, interactive drag/drop/resize for **Signature**, **Date**, and **Official Stamp** fields, high-DPI preview up to 500 MB. |
+| **10. PowerPoint (`.pptx`) ↔ PDF** | Bidirectional conversion between PowerPoint presentations and PDF 100% in memory using pure-.NET open-source engines. | **PPTX → PDF**: Slide thumbnail inspector with per-slide selection, live upload & conversion progress bars, custom/polygon/hollow shapes (`Hexagon`, `Donut`, `Frame`, arrows, stars, masked images), dark & light themes, speaker notes, slide numbers, compact PDF optimization.<br>**PDF → PPTX**: High-DPI (144 / 216 DPI) page-by-page rendering into valid Microsoft PowerPoint `.pptx` decks with `Match Source`, `16:9`, or `4:3` slide sizing and custom page ranges. |
 
 ---
 
@@ -64,6 +65,7 @@ flowchart LR
     Service --> PdfEngine["FastPdfEngine<br/>(PDFsharp + SkiaSharp)"]
     Service --> WordEngine["LocalWordConverter<br/>(OpenXML + HarfBuzz)"]
     Service --> SheetMdEngine["LocalSpreadsheetMarkdownConverter<br/>(OpenXML + Markdown Layout)"]
+    Service --> PptxEngine["LocalPowerPointConverter<br/>(OfficeIMO + OpenXML + SkiaSharp)"]
 ```
 
 ### Repository Structure
@@ -73,8 +75,8 @@ mnshor/
 ├── Mnshor.sln                                # Solution file (.NET 11)
 ├── src/
 │   ├── Mnshor/                               # Main Blazor Interactive Server & Windows Service host
-│   │   ├── Components/Pages/                 # 8 interactive document tool pages
-│   │   ├── Engines/                          # In-memory PDF, Word, Excel, Markdown, Font & Emoji engines
+│   │   ├── Components/Pages/                 # 10 interactive document tool pages
+│   │   ├── Engines/                          # In-memory PDF, Word, Excel, Markdown, PowerPoint, Font & Emoji engines
 │   │   ├── Models/                           # Options, metadata, and execution result models
 │   │   ├── Services/                         # Bilingual (AR/EN) localization & state management
 │   │   └── wwwroot/                          # Prism CSS theme, PDF.js worker, client interop
@@ -108,7 +110,7 @@ Then open **`http://localhost:5157`** in your browser.
 
 ### 2. Run the Automated Unit Tests
 
-Mnshor includes a comprehensive `xUnit` suite validating PDF merging, splitting, rotation, page removal, reordering, metadata sanitization, text/image watermarking, Word (`.docx`) conversion, Excel (`.xlsx`) table pagination, and Markdown (`.md`) rendering:
+Mnshor includes a comprehensive `xUnit` suite validating PDF merging, splitting, rotation, page removal, reordering, metadata sanitization, text/image watermarking, PDF signing, Word (`.docx`) conversion, Excel (`.xlsx`) table pagination, Markdown (`.md`) rendering, and bidirectional PowerPoint (`.pptx`) ↔ PDF conversion:
 
 ```powershell
 dotnet test Mnshor.sln -c Release
@@ -124,7 +126,7 @@ dotnet tool install --global wix
 wix extension add -g WixToolset.UI.wixext
 
 # Build the MSI package into ./dist/
-.\installer\build-msi.ps1 -Version 0.2.0 -Stage alpha
+.\installer\build-msi.ps1 -Version 0.3.0 -Stage alpha
 ```
 
 ---
@@ -138,7 +140,8 @@ wix extension add -g WixToolset.UI.wixext
 | **[.NET 11 & ASP.NET Core Blazor](https://github.com/dotnet/aspnetcore)** | High-performance runtime, Interactive Server UI components, and Windows Service hosting (`Microsoft.Extensions.Hosting.WindowsServices`). | [MIT](https://github.com/dotnet/aspnetcore/blob/main/LICENSE.txt) |
 | **[PDFsharp](https://github.com/empira/PDFsharp)** | Core in-memory PDF document reading, page assembly, splitting, rotation, metadata sanitization, and vector drawing. | [MIT](https://github.com/empira/PDFsharp/blob/master/LICENSE) |
 | **[SkiaSharp](https://github.com/mono/SkiaSharp) & [HarfBuzz](https://github.com/harfbuzz/harfbuzz)** | 2D graphics rendering, image watermark compositing, and complex Arabic (`RTL`) text shaping (`SkiaSharp.HarfBuzz`). | [MIT](https://github.com/mono/SkiaSharp/blob/main/LICENSE.md) |
-| **[Open-XML-SDK (`DocumentFormat.OpenXml`)](https://github.com/dotnet/Open-XML-SDK)** | Native in-memory parsing of Microsoft Word (`.docx`) documents and Excel (`.xlsx`) workbooks without requiring Office installation. | [MIT](https://github.com/dotnet/Open-XML-SDK/blob/main/LICENSE) |
+| **[Open-XML-SDK (`DocumentFormat.OpenXml`)](https://github.com/dotnet/Open-XML-SDK)** | Native in-memory parsing and generation of Microsoft Word (`.docx`), Excel (`.xlsx`), and PowerPoint (`.pptx`) files without requiring Office installation. | [MIT](https://github.com/dotnet/Open-XML-SDK/blob/main/LICENSE) |
+| **[OfficeIMO (`OfficeIMO.PowerPoint.Pdf`)](https://github.com/EvotecIT/OfficeIMO)** | Pure-.NET PowerPoint (`.pptx`) to vector PDF export engine (charts, tables, shapes, SmartArt, and slide layouts). | [MIT](https://github.com/EvotecIT/OfficeIMO/blob/master/LICENSE) |
 | **[Mozilla PDF.js](https://github.com/mozilla/pdf.js)** | Fast client-side PDF page thumbnail previews inside the browser. | [Apache-2.0](https://github.com/mozilla/pdf.js/blob/master/LICENSE) |
 | **[WiX Toolset](https://github.com/wixtoolset/wix)** | Packaging Mnshor and `MnshorService` into a clean Windows `.msi` installer. | [MS-RL](https://wixtoolset.org/about/license/) |
 | **[xUnit.net](https://github.com/xunit/xunit) & [Coverlet](https://github.com/coverlet-coverage/coverlet)** | Automated unit testing and code coverage verification for all document engines. | [Apache-2.0](https://github.com/xunit/xunit/blob/main/LICENSE) / [MIT](https://github.com/coverlet-coverage/coverlet/blob/master/LICENSE) |

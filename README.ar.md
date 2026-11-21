@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml/badge.svg)](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/amdnaji/mnshor?include_prereleases&label=Release)](https://github.com/amdnaji/mnshor/releases)
-[![Version](https://img.shields.io/badge/Version-0.2.0--alpha-D4A359)](#)
+[![Version](https://img.shields.io/badge/Version-0.3.0--alpha-D4A359)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET 11.0](https://img.shields.io/badge/.NET-11.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Cross--Platform%20Web-0078D6)](#طريقة-التشغيل-والبناء-من-المصدر)
@@ -24,7 +24,7 @@
 
 ## نبذة عن المشروع
 
-**مَنشُور (Mnshor)** هو منصة مفتوحة المصدر وعالية الأداء لمعالجة ملفات الـ PDF والمستندات المكتبية، صُممت لتعمل **محلياً بنسبة 100% داخل جهازك**. تتم جميع العمليات—من دمج وتقسيم وتدوير وإضافة العلامات المائية وتنظيف البيانات الوصفية، إلى تحويل ملفات Word (`.docx`) و Excel (`.xlsx`) و Markdown (`.md`) إلى PDF—**بشكل كامل داخل الذاكرة العشوائية (`MemoryStream` / RAM)** دون رفع أي ملف إلى السحابة ودون كتابة أي ملفات مؤقتة على القرص الصلب.
+**مَنشُور (Mnshor)** هو منصة مفتوحة المصدر وعالية الأداء لمعالجة ملفات الـ PDF والمستندات المكتبية، صُممت لتعمل **محلياً بنسبة 100% داخل جهازك**. تتم جميع العمليات—من دمج وتقسيم وتدوير وتوقيع وإضافة العلامات المائية وتنظيف البيانات الوصفية، إلى تحويل ملفات Word (`.docx`) و Excel (`.xlsx`) و Markdown (`.md`) و PowerPoint (`.pptx`) من وإلى PDF—**بشكل كامل داخل الذاكرة العشوائية (`MemoryStream` / RAM)** دون رفع أي ملف إلى السحابة ودون كتابة أي ملفات مؤقتة على القرص الصلب.
 
 على نظام Windows، يمكن تشغيل **مَنشُور** كخدمة خلفية خفيفة (`MnshorService` تعمل حصرياً على العنوان المحلي `http://127.0.0.1:5157`) مع مشغّل فوري لسطح المكتب (`Mnshor.Launcher.exe`)، أو تشغيله مباشرةً كتطبيق ويب محلي مبني على `.NET 11`.
 
@@ -53,6 +53,7 @@
 | **7. إضافة علامة مائية إلى PDF** | ختم المستند بنص شفاف (مثل: `سري للغاية` / `مسودة`) أو شعار مصور. | دعم النصوص العربية والإنجليزية والصور (`PNG`/`JPG`/`WebP`)، معاينة حية، تحديد الموضع عبر شبكة 9 نقاط، **وضع الفسيفساء (التكرار الشبكي)**، التحكم بالشفافية والزاوية والطبقة (فوق/خلف المحتوى). |
 | **8. تحويل Word و Excel و Markdown إلى PDF** | تحويل ملفات `.docx` و `.xlsx` و `.md` إلى مستندات PDF منسقة وجاهزة للطباعة. | **Word (`.docx`)**: العناوين، الجداول، القوائم، التنسيقات، الصور، ودعم العربية.<br>**Excel (`.xlsx`)**: استعراض أوراق العمل، معاينة فورية، اتجاه أفقي/عمودي، أحجام ورق (`A4`/`A3`/`Letter`)، اتجاه أعمدة (`RTL`/`LTR`)، تكرار الترويسة، وتلوين الصفوف بالتناوب.<br>**Markdown (`.md`)**: محرر مباشر مع نماذج جاهزة بالعربية والإنجليزية، جداول، كتل برمجية، واقتباسات. |
 | **9. توقيع مستند PDF** | توقيع وختم ملفات PDF تفاعلياً في الذاكرة بخطوط النظام أو الرسم الحر أو رفع الأختام. | **الكتابة بخطوط النظام (`OS Fonts`)** العربية والإنجليزية مع خط زخرفي سفلي، **الرسم الحر** بالماوس أو القلم الرقمي، **رفع صورة أو ختم** مع توحيد لون الحبر، سحب وإفلات وتغيير حجم حقول **التوقيع** و**التاريخ** و**الختم الرسمي**، ومعاينة فائقة الدقة حتى 500 ميجابايت. |
+| **10. تحويل PowerPoint (`.pptx`) ↔ PDF** | تحويل ثنائي الاتجاه بين عروض PowerPoint وملفات PDF بنسبة 100% في الذاكرة بمحركات `.NET` مفتوحة المصدر. | **PowerPoint → PDF**: استعراض الشرائح بالمعاينة المصغّرة وتحديد شرائح مخصصة، شريط انتظار وتقدّم لحظي أثناء الرفع والتحويل، دعم الأشكال المخصصة والمضلعات والخلفيات الداكنة وملاحظات المتحدث وأرقام الشرائح مع ضغط ذكي لحجم الـ PDF.<br>**PDF → PowerPoint**: تصيير عالي الدقة (`144` / `216 DPI`) صفحةً بصفحة إلى عروض `.pptx` متوافقة تماماً مع Microsoft PowerPoint مع خيارات أبعاد (`مطابق للمصدر` / `16:9` / `4:3`) ونطاق صفحات مخصص. |
 
 ---
 
@@ -65,8 +66,8 @@ mnshor/
 ├── Mnshor.sln                                # ملف الحل البرمجي (.NET 11)
 ├── src/
 │   ├── Mnshor/                               # تطبيق الويب المحلي (Blazor Interactive Server) وخدمة Windows
-│   │   ├── Components/Pages/                 # واجهات الأدوات الثمان التفاعلية
-│   │   ├── Engines/                          # محركات المعالجة في الذاكرة (PDF, Word, Excel, Markdown, Fonts)
+│   │   ├── Components/Pages/                 # واجهات الأدوات العشر التفاعلية
+│   │   ├── Engines/                          # محركات المعالجة في الذاكرة (PDF, Word, Excel, Markdown, PowerPoint, Fonts)
 │   │   ├── Models/                           # نماذج البيانات والخيارات ونتائج التنفيذ
 │   │   ├── Services/                         # نظام الترجمة الفوري (عربي / إنجليزي) وإدارة الحالة
 │   │   └── wwwroot/                          # التصميم (Prism CSS) ومحرك المعاينة PDF.js
@@ -106,7 +107,7 @@ dotnet run --project src/Mnshor/Mnshor.csproj
 
 ### 2. تشغيل الاختبارات البرمجية (Unit Tests)
 
-يحتوي المشروع على حزمة اختبارات `xUnit` للتحقق من دقة جميع محركات الدمج، التقسيم، التدوير، الحذف، إعادة الترتيب، تنظيف البيانات الوصفية، العلامة المائية، وتحويل ملفات Word و Excel و Markdown:
+يحتوي المشروع على حزمة اختبارات `xUnit` للتحقق من دقة جميع محركات الدمج، التقسيم، التدوير، الحذف، إعادة الترتيب، تنظيف البيانات الوصفية، العلامة المائية، التوقيع، وتحويل ملفات Word و Excel و Markdown و PowerPoint (`.pptx`) من وإلى PDF:
 
 </div>
 
@@ -128,7 +129,7 @@ dotnet tool install --global wix
 wix extension add -g WixToolset.UI.wixext
 
 # بناء ملف الـ MSI داخل مجلد ./dist/
-.\installer\build-msi.ps1 -Version 0.2.0 -Stage alpha
+.\installer\build-msi.ps1 -Version 0.3.0 -Stage alpha
 ```
 
 <div dir="rtl">
@@ -144,7 +145,8 @@ wix extension add -g WixToolset.UI.wixext
 | **[.NET 11 & ASP.NET Core Blazor](https://github.com/dotnet/aspnetcore)** | بيئة التشغيل عالية الأداء، مكونات الواجهة التفاعلية، واستضافة خدمة Windows (`Microsoft.Extensions.Hosting.WindowsServices`). | [MIT](https://github.com/dotnet/aspnetcore/blob/main/LICENSE.txt) |
 | **[PDFsharp](https://github.com/empira/PDFsharp)** | المحرك الأساسي لقراءة وتعديل ملفات الـ PDF في الذاكرة (الدمج، التقسيم، التدوير، البيانات الوصفية، والرسم المتجهي). | [MIT](https://github.com/empira/PDFsharp/blob/master/LICENSE) |
 | **[SkiaSharp](https://github.com/mono/SkiaSharp) & [HarfBuzz](https://github.com/harfbuzz/harfbuzz)** | معالجة الرسوميات ثنائية الأبعاد، دمج شعارات العلامة المائية، وتشكيل الحروف العربية المتصلة (`SkiaSharp.HarfBuzz`). | [MIT](https://github.com/mono/SkiaSharp/blob/main/LICENSE.md) |
-| **[Open-XML-SDK (`DocumentFormat.OpenXml`)](https://github.com/dotnet/Open-XML-SDK)** | قراءة وتحليل مستندات Word (`.docx`) وجداول بيانات Excel (`.xlsx`) مباشرةً في الذاكرة دون الحاجة لتثبيت Microsoft Office. | [MIT](https://github.com/dotnet/Open-XML-SDK/blob/main/LICENSE) |
+| **[Open-XML-SDK (`DocumentFormat.OpenXml`)](https://github.com/dotnet/Open-XML-SDK)** | قراءة وإنشاء مستندات Word (`.docx`) وجداول Excel (`.xlsx`) وعروض PowerPoint (`.pptx`) مباشرةً في الذاكرة دون الحاجة لتثبيت Microsoft Office. | [MIT](https://github.com/dotnet/Open-XML-SDK/blob/main/LICENSE) |
+| **[OfficeIMO (`OfficeIMO.PowerPoint.Pdf`)](https://github.com/EvotecIT/OfficeIMO)** | محرك `.NET` خالص لتحويل عروض PowerPoint (`.pptx`) إلى ملفات PDF متجهية (الرسوم البيانية، الجداول، الأشكال، وتخطيطات الشرائح). | [MIT](https://github.com/EvotecIT/OfficeIMO/blob/master/LICENSE) |
 | **[Mozilla PDF.js](https://github.com/mozilla/pdf.js)** | عرض المعاينات المصغّرة لصفحات الـ PDF بسرعة عالية داخل المتصفح. | [Apache-2.0](https://github.com/mozilla/pdf.js/blob/master/LICENSE) |
 | **[WiX Toolset](https://github.com/wixtoolset/wix)** | بناء حزمة التثبيت الرسمية `.msi` لنظام Windows وتسجيل الخدمة المحلية. | [MS-RL](https://wixtoolset.org/about/license/) |
 | **[xUnit.net](https://github.com/xunit/xunit) & [Coverlet](https://github.com/coverlet-coverage/coverlet)** | إطار الاختبارات البرمجية المؤتمتة وقياس تغطية الشيفرة المصدرية. | [Apache-2.0](https://github.com/xunit/xunit/blob/main/LICENSE) / [MIT](https://github.com/coverlet-coverage/coverlet/blob/master/LICENSE) |
