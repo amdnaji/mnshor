@@ -22,7 +22,7 @@
 
 ## Overview
 
-**Mnshor (مَنشُور)** is a fast, privacy-first PDF and document processing suite engineered to run **100% locally on your machine**. Every document operation—merging, splitting, rotating, watermarking, signing, stripping metadata, or converting Word (`.docx`), Excel (`.xlsx`), Markdown (`.md`), and PowerPoint (`.pptx`) files to and from PDF—executes **entirely in RAM (`MemoryStream`)** with **zero cloud uploads** and **zero temporary disk writes**.
+**Mnshor (مَنشُور)** is a fast, privacy-first PDF and document processing suite engineered to run **100% locally on your machine**. Every document operation—merging, splitting, rotating, watermarking, signing, stripping metadata, exporting PDFs to images, or converting Word (`.docx`), Excel (`.xlsx`), Markdown (`.md`), and PowerPoint (`.pptx`) files to and from PDF—executes **entirely in RAM (`MemoryStream`)** with **zero cloud uploads** and **zero temporary disk writes**.
 
 On Windows, Mnshor can run either as a lightweight background Windows Service (`MnshorService` bound strictly to `http://127.0.0.1:5157`) paired with an instant desktop launcher (`Mnshor.Launcher.exe`), or directly as a self-hosted .NET 11 web application.
 
@@ -52,6 +52,7 @@ On Windows, Mnshor can run either as a lightweight background Windows Service (`
 | **8. Word, Excel & Markdown to PDF** | Convert `.docx`, `.xlsx`, and `.md` files into print-ready PDFs in RAM. | **Word (`.docx`)**: Headings, tables, lists, inline styling, images, RTL/LTR.<br>**Excel (`.xlsx`)**: Multi-sheet selector, live preview, Landscape/Portrait, A4/A3/Letter, RTL/LTR column flow, repeating headers, zebra striping, gridlines.<br>**Markdown (`.md`) Studio**: Live editor with English & Arabic sample templates, tables, code blocks, blockquotes, and auto-direction. |
 | **9. Sign PDF Document** | Sign and stamp PDFs interactively in memory with OS fonts, freehand drawing, or image stamps. | **Type (OS Fonts)** with Arabic & English script fonts and flourish underline, **Draw Freehand** canvas, **Upload Image/Stamp** with ink tinting, interactive drag/drop/resize for **Signature**, **Date**, and **Official Stamp** fields, high-DPI preview up to 500 MB. |
 | **10. PowerPoint (`.pptx`) ↔ PDF** | Bidirectional conversion between PowerPoint presentations and PDF 100% in memory using pure-.NET open-source engines. | **PPTX → PDF**: Slide thumbnail inspector with per-slide selection, live upload & conversion progress bars, custom/polygon/hollow shapes (`Hexagon`, `Donut`, `Frame`, arrows, stars, masked images), dark & light themes, speaker notes, slide numbers, compact PDF optimization.<br>**PDF → PPTX**: High-DPI (144 / 216 DPI) page-by-page rendering into valid Microsoft PowerPoint `.pptx` decks with `Match Source`, `16:9`, or `4:3` slide sizing and custom page ranges. |
+| **11. PDF to Images (`JPG` / `PNG` / `WebP`)** | Convert PDF pages into high-DPI images or extract all embedded raster images from a PDF 100% in memory. | **Page to Image**: Visual lazy-loaded page thumbnail picker, custom page ranges (`1-3, 5`), `JPG` / `PNG` / `WebP` output, `Normal (150 DPI)` / `High (216 DPI)` / `Ultra (300 DPI)` quality, live progress bar, direct download for single pages or in-memory `.zip` for multi-page exports.<br>**Extract Embedded Images**: Scans `/XObject` streams (including Form XObjects and `/SMask` transparency) at native resolution with preview gallery, one-click single image download, and batch `.zip` export. |
 
 ---
 
@@ -66,6 +67,7 @@ flowchart LR
     Service --> WordEngine["LocalWordConverter<br/>(OpenXML + HarfBuzz)"]
     Service --> SheetMdEngine["LocalSpreadsheetMarkdownConverter<br/>(OpenXML + Markdown Layout)"]
     Service --> PptxEngine["LocalPowerPointConverter<br/>(OfficeIMO + OpenXML + SkiaSharp)"]
+    Service --> ImgEngine["LocalPdfImageConverter<br/>(PDFsharp + SkiaSharp + ZIP)"]
 ```
 
 ### Repository Structure
@@ -75,8 +77,8 @@ mnshor/
 ├── Mnshor.sln                                # Solution file (.NET 11)
 ├── src/
 │   ├── Mnshor/                               # Main Blazor Interactive Server & Windows Service host
-│   │   ├── Components/Pages/                 # 10 interactive document tool pages
-│   │   ├── Engines/                          # In-memory PDF, Word, Excel, Markdown, PowerPoint, Font & Emoji engines
+│   │   ├── Components/Pages/                 # 11 interactive document tool pages
+│   │   ├── Engines/                          # In-memory PDF, Word, Excel, Markdown, PowerPoint, Image, Font & Emoji engines
 │   │   ├── Models/                           # Options, metadata, and execution result models
 │   │   ├── Services/                         # Bilingual (AR/EN) localization & state management
 │   │   └── wwwroot/                          # Prism CSS theme, PDF.js worker, client interop
@@ -110,7 +112,7 @@ Then open **`http://localhost:5157`** in your browser.
 
 ### 2. Run the Automated Unit Tests
 
-Mnshor includes a comprehensive `xUnit` suite validating PDF merging, splitting, rotation, page removal, reordering, metadata sanitization, text/image watermarking, PDF signing, Word (`.docx`) conversion, Excel (`.xlsx`) table pagination, Markdown (`.md`) rendering, and bidirectional PowerPoint (`.pptx`) ↔ PDF conversion:
+Mnshor includes a comprehensive `xUnit` suite validating PDF merging, splitting, rotation, page removal, reordering, metadata sanitization, text/image watermarking, PDF signing, Word (`.docx`) conversion, Excel (`.xlsx`) table pagination, Markdown (`.md`) rendering, bidirectional PowerPoint (`.pptx`) ↔ PDF conversion, and PDF-to-Images extraction & packaging:
 
 ```powershell
 dotnet test Mnshor.sln -c Release

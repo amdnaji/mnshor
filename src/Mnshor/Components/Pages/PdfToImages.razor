@@ -1,0 +1,759 @@
+@page "/pdf-to-images"
+@page "/pdf-to-jpg"
+@rendermode InteractiveServer
+@inject LocalizationState Loc
+@inject IPdfEngine PdfEngine
+@inject IPdfImageConverter PdfImageConverter
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>@Loc["PdfToImagesTitle"] - @Loc["AppName"]</PageTitle>
+
+<a href="/" class="back-link">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="@(Loc.IsRtl ? "transform: rotate(180deg);" : "")">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+    </svg>
+    <span>@Loc["BackToTools"]</span>
+</a>
+
+<div class="panel-card">
+    <div class="panel-header">
+        <div>
+            <h1 class="panel-title">@Loc["PdfToImagesTitle"]</h1>
+            <p class="panel-desc">@Loc["PdfToImagesDesc"]</p>
+        </div>
+    </div>
+
+    @if (isLoadingFile)
+    {
+        <div class="mnshor-loading-card">
+            <div class="mnshor-spinner"></div>
+            <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">@loadingFileName</div>
+            <div style="font-size: 0.88rem; color: var(--text-secondary);">@Loc["LoadingPdfFile"]</div>
+        </div>
+    }
+
+    @if (selectedFile == null)
+    {
+        <label class="smart-dropzone" style="@(isLoadingFile ? "display: none;" : "")">
+            <InputFile class="dropzone-input-overlay" OnChange="OnFileSelectedAsync" accept=".pdf" />
+            <div class="dropzone-icon" style="color: #0891B2; background: #ECFEFF;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+            </div>
+            <div class="dropzone-text">@Loc["SelectPdfForImagesPrompt"]</div>
+            <div class="dropzone-subtext">PDF — 100% Local In-Memory Rendering & Image Extraction (Max 500 MB)</div>
+        </label>
+    }
+    else
+    {
+        <div class="excel-md-workspace">
+            <!-- Left Main Stage -->
+            <div class="watermark-main-stage">
+                <div class="file-item" style="margin-bottom: 1rem;">
+                    <div class="file-info">
+                        <div class="file-icon" style="color: #0891B2;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="file-name">@selectedFile.FileName</div>
+                            <div class="file-meta-badges">
+                                <span class="file-badge">@selectedFile.FormattedSize</span>
+                                <span class="file-badge badge-accent">@selectedFile.PageCount @Loc["PagesCount"]</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn-lang" @onclick="ResetFileAsync" style="color: var(--danger); border-color: var(--danger-border); background: var(--danger-surface);">
+                        <span>@Loc["Remove"]</span>
+                    </button>
+                </div>
+
+                @if (options.Mode == PdfImageConversionMode.PagesToImages)
+                {
+                    <!-- Page Selection Toolbar -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-secondary);">
+                            @Loc["PagesSelectedForExport"] (@options.SelectedPages.Count / @selectedFile.PageCount)
+                        </span>
+                        <div style="display: flex; gap: 0.45rem; flex-wrap: wrap; align-items: center;">
+                            <button type="button" class="wm-preset-chip" @onclick="SelectAllPages">@Loc["SelectAll"]</button>
+                            <button type="button" class="wm-preset-chip" @onclick="ClearPageSelection">@Loc["ClearSelection"]</button>
+                            <input type="text"
+                                   class="compact-input"
+                                   style="width: 170px; padding: 0.32rem 0.55rem; font-size: 0.8rem;"
+                                   placeholder="@Loc["RangePlaceholder"]"
+                                   @bind="options.CustomRange"
+                                   @bind:event="oninput" />
+                            <button type="button" class="wm-preset-chip" @onclick="ApplyCustomRangeSelection">@Loc["Apply"]</button>
+                        </div>
+                    </div>
+
+                    <!-- Lazy PDF Page Thumbnail Grid (Paginated for 100+ page docs) -->
+                    <div id="pdf-to-images-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 0.9rem;">
+                        @for (int p = PageStart; p <= PageEnd; p++)
+                        {
+                            int pageNum = p;
+                            bool isSelected = options.SelectedPages.Contains(pageNum);
+                            <div @key="pageNum"
+                                 class="page-thumbnail-card clickable-card"
+                                 style="@(isSelected ? "border-color: #0891B2; background: #ECFEFF;" : "opacity: 0.58;")"
+                                 @onclick="() => TogglePageSelection(pageNum, !isSelected)">
+                                <div class="page-card-header">
+                                    <span class="page-index-pill">@Loc["Page"] @pageNum</span>
+                                    <input type="checkbox"
+                                           checked="@isSelected"
+                                           style="width: 16px; height: 16px; accent-color: #0891B2;"
+                                           @onclick:stopPropagation="true"
+                                           @onchange="(e) => TogglePageSelection(pageNum, e.Value is bool b && b)" />
+                                </div>
+                                <div class="preview-canvas-holder" data-pdf-page="@pageNum" style="width: 100%; min-height: 145px; display: flex; align-items: center; justify-content: center; background: #FFFFFF; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-subtle);">
+                                    <img class="page-thumbnail-canvas" alt="Page @pageNum" style="width: 100%; height: auto; display: block;" />
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    @if (TotalGridPages > 1)
+                    {
+                        <div style="display: flex; justify-content: center; align-items: center; gap: 0.65rem; margin-top: 1.1rem;">
+                            <button type="button" class="wm-preset-chip" disabled="@(currentGridPage <= 1)" @onclick="() => GoToGridPageAsync(currentGridPage - 1)">‹</button>
+                            <span style="font-size: 0.84rem; font-weight: 600; color: var(--text-secondary);">@currentGridPage / @TotalGridPages</span>
+                            <button type="button" class="wm-preset-chip" disabled="@(currentGridPage >= TotalGridPages)" @onclick="() => GoToGridPageAsync(currentGridPage + 1)">›</button>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <!-- Extract Embedded Images Gallery -->
+                    @if (isScanningEmbedded)
+                    {
+                        <div class="mnshor-loading-card">
+                            <div class="mnshor-spinner"></div>
+                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);">@Loc["ScanningEmbeddedImages"]</div>
+                            <div class="mnshor-progress-wrap" style="max-width: 340px;">
+                                <div class="mnshor-progress-header">
+                                    <span>@scanStepText</span>
+                                    <span>@scanProgressPercent%</span>
+                                </div>
+                                <div class="mnshor-progress-track">
+                                    <div class="mnshor-progress-fill" style="width: @(scanProgressPercent)%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else if (extractedImages.Count == 0)
+                    {
+                        <div class="mnshor-loading-card" style="padding: 2.25rem 1.25rem;">
+                            <div style="font-size: 1.8rem;">🖼️</div>
+                            <div style="font-size: 0.92rem; color: var(--text-secondary); max-width: 440px;">
+                                @Loc["NoEmbeddedImagesFound"]
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-secondary);">
+                                @Loc["EmbeddedImagesFound"] (@extractedImages.Count(x => x.IsSelected) / @extractedImages.Count)
+                            </span>
+                            <div style="display: flex; gap: 0.45rem;">
+                                <button type="button" class="wm-preset-chip" @onclick="SelectAllExtracted">@Loc["SelectAll"]</button>
+                                <button type="button" class="wm-preset-chip" @onclick="ClearExtractedSelection">@Loc["ClearSelection"]</button>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.9rem;">
+                            @foreach (var img in extractedImages)
+                            {
+                                <div @key="img.Index"
+                                     class="page-thumbnail-card clickable-card"
+                                     style="@(img.IsSelected ? "border-color: #0891B2; background: #ECFEFF;" : "opacity: 0.58;")"
+                                     @onclick="() => img.IsSelected = !img.IsSelected">
+                                    <div class="page-card-header">
+                                        <span class="page-index-pill">@Loc["Page"] @img.PageNumber</span>
+                                        <input type="checkbox"
+                                               checked="@img.IsSelected"
+                                               style="width: 16px; height: 16px; accent-color: #0891B2;"
+                                               @onclick:stopPropagation="true"
+                                               @onchange="(e) => img.IsSelected = e.Value is bool b && b" />
+                                    </div>
+                                    <div style="width: 100%; height: 135px; display: flex; align-items: center; justify-content: center; background: repeating-conic-gradient(#F1F5F9 0% 25%, #FFFFFF 0% 50%) 50% / 14px 14px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-subtle);">
+                                        @if (!string.IsNullOrEmpty(img.PreviewDataUrl))
+                                        {
+                                            <img src="@img.PreviewDataUrl" alt="@img.FileName" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
+                                        }
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.35rem; margin-top: 0.25rem;">
+                                        <span style="font-size: 0.74rem; color: var(--text-secondary); font-weight: 600;">@img.Width×@img.Height • @img.FormattedSize</span>
+                                        <button type="button"
+                                                class="wm-preset-chip"
+                                                style="padding: 0.2rem 0.5rem; font-size: 0.74rem;"
+                                                @onclick:stopPropagation="true"
+                                                @onclick="() => DownloadSingleExtractedAsync(img)">
+                                            @Loc["DownloadSingleImage"]
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+
+            <!-- Right Sidebar (iLovePDF-style Mode & Format Controls) -->
+            <aside class="watermark-sidebar">
+                <div class="watermark-sidebar-header">
+                    @Loc["PageSetupTitle"]
+                </div>
+
+                <div class="watermark-sidebar-body">
+                    <!-- iLovePDF 2-Card Mode Selector -->
+                    <div class="wm-section" style="gap: 0.55rem;">
+                        <label class="radio-card @(options.Mode == PdfImageConversionMode.PagesToImages ? "active" : "")"
+                               style="cursor: pointer; padding: 0.75rem;"
+                               @onclick="() => SetModeAsync(PdfImageConversionMode.PagesToImages)">
+                            <input type="radio" name="pdfImgMode" checked="@(options.Mode == PdfImageConversionMode.PagesToImages)" />
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.88rem;">@Loc["PdfImgModePagesTitle"]</div>
+                                <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.15rem;">@Loc["PdfImgModePagesDesc"]</div>
+                            </div>
+                        </label>
+
+                        <label class="radio-card @(options.Mode == PdfImageConversionMode.ExtractEmbeddedImages ? "active" : "")"
+                               style="cursor: pointer; padding: 0.75rem;"
+                               @onclick="() => SetModeAsync(PdfImageConversionMode.ExtractEmbeddedImages)">
+                            <input type="radio" name="pdfImgMode" checked="@(options.Mode == PdfImageConversionMode.ExtractEmbeddedImages)" />
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.88rem;">@Loc["PdfImgModeExtractTitle"]</div>
+                                <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.15rem;">@Loc["PdfImgModeExtractDesc"]</div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Output Image Format -->
+                    <div class="wm-section">
+                        <label class="wm-label">@Loc["OutputFormatLabel"]</label>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45rem;">
+                            <button type="button" class="layer-card @(options.Format == ImageOutputFormat.Jpg ? "active" : "")" @onclick="() => ChangeFormatAsync(ImageOutputFormat.Jpg)">JPG</button>
+                            <button type="button" class="layer-card @(options.Format == ImageOutputFormat.Png ? "active" : "")" @onclick="() => ChangeFormatAsync(ImageOutputFormat.Png)">PNG</button>
+                            <button type="button" class="layer-card @(options.Format == ImageOutputFormat.WebP ? "active" : "")" @onclick="() => ChangeFormatAsync(ImageOutputFormat.WebP)">WebP</button>
+                        </div>
+                    </div>
+
+                    <!-- Image Quality (for Page-to-Image mode) -->
+                    @if (options.Mode == PdfImageConversionMode.PagesToImages)
+                    {
+                        <div class="wm-section">
+                            <label class="wm-label">@Loc["ImageQualityLabel"]</label>
+                            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                                <button type="button" class="layer-card @(options.Quality == ImageRenderQuality.Normal ? "active" : "")" @onclick="() => options.Quality = ImageRenderQuality.Normal">@Loc["ImgQualityNormal"]</button>
+                                <button type="button" class="layer-card @(options.Quality == ImageRenderQuality.High ? "active" : "")" @onclick="() => options.Quality = ImageRenderQuality.High">@Loc["ImgQualityHigh"]</button>
+                                <button type="button" class="layer-card @(options.Quality == ImageRenderQuality.Ultra ? "active" : "")" @onclick="() => options.Quality = ImageRenderQuality.Ultra">@Loc["ImgQualityUltra"]</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="watermark-sidebar-footer">
+                    @if (options.Mode == PdfImageConversionMode.PagesToImages)
+                    {
+                        <button type="button"
+                                class="btn-primary-action"
+                                disabled="@(isProcessing || options.SelectedPages.Count == 0)"
+                                @onclick="ExecutePagesToImagesAsync">
+                            @if (isProcessing)
+                            {
+                                <span>@Loc["Processing"] (@convertProgressPercent%)</span>
+                            }
+                            else
+                            {
+                                <span>@Loc["ConvertPdfToImagesBtn"] (@options.Format.ToString().ToUpperInvariant())</span>
+                            }
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="button"
+                                class="btn-primary-action"
+                                disabled="@(isProcessing || isScanningEmbedded || !extractedImages.Any(x => x.IsSelected))"
+                                @onclick="ExecuteDownloadExtractedAsync">
+                            @if (isProcessing)
+                            {
+                                <span>@Loc["Processing"] (@convertProgressPercent%)</span>
+                            }
+                            else
+                            {
+                                <span>@Loc["ExtractImagesBtn"] (@extractedImages.Count(x => x.IsSelected))</span>
+                            }
+                        </button>
+                    }
+
+                    @if (isProcessing)
+                    {
+                        <div class="mnshor-progress-wrap">
+                            <div class="mnshor-progress-header">
+                                <span>@convertStatusText</span>
+                                <span>@convertProgressPercent%</span>
+                            </div>
+                            <div class="mnshor-progress-track">
+                                <div class="mnshor-progress-fill" style="width: @(convertProgressPercent)%;"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </aside>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="margin-top: 1.25rem; padding: 0.85rem 1.25rem; background: var(--danger-surface); border: 1px solid var(--danger-border); border-radius: 8px; color: var(--danger); font-size: 0.9rem;">
+            @errorMessage
+        </div>
+    }
+
+    @if (lastResult != null && lastResult.Success)
+    {
+        <div class="telemetry-card">
+            <div class="telemetry-header">
+                <span style="display: flex; align-items: center; gap: 0.4rem;">
+                    <span>✓ @Loc["PdfToImagesSuccess"]</span>
+                </span>
+                <span class="telemetry-speed">⚡ @lastResult.ElapsedMilliseconds @Loc["Milliseconds"]</span>
+            </div>
+            <div class="telemetry-summary">@lastResult.Summary</div>
+            <div class="telemetry-note">@Loc["ZeroDiskIoNotice"]</div>
+            <div style="margin-top: 0.35rem;">
+                <button type="button" class="btn-primary-action" style="padding: 0.65rem 1.5rem; font-size: 0.92rem; width: auto;" @onclick="DownloadAgainAsync">
+                    <span>@Loc["DownloadResult"] (@lastResult.OutputFileName)</span>
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private const int PagesPerGridView = 24;
+
+    private PdfToImagesOptions options = new();
+    private DocumentItem? selectedFile;
+    private List<ExtractedPdfImage> extractedImages = new();
+    private ImageOutputFormat? extractedFormatCache;
+
+    private bool isLoadingFile = false;
+    private string loadingFileName = string.Empty;
+    private bool isScanningEmbedded = false;
+    private int scanProgressPercent = 0;
+    private string scanStepText = string.Empty;
+
+    private bool isProcessing = false;
+    private int convertProgressPercent = 0;
+    private string convertStatusText = string.Empty;
+
+    private bool needsPreviewInit = false;
+    private bool needsPreviewSync = false;
+    private int currentGridPage = 1;
+
+    private string? errorMessage;
+    private ExecutionResult? lastResult;
+
+    private int TotalGridPages => selectedFile == null ? 1 : Math.Max(1, (int)Math.Ceiling(selectedFile.PageCount / (double)PagesPerGridView));
+    private int PageStart => ((currentGridPage - 1) * PagesPerGridView) + 1;
+    private int PageEnd => selectedFile == null ? 0 : Math.Min(selectedFile.PageCount, currentGridPage * PagesPerGridView);
+
+    protected override void OnInitialized()
+    {
+        Loc.OnChange += StateHasChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (needsPreviewInit && selectedFile != null && options.Mode == PdfImageConversionMode.PagesToImages)
+        {
+            needsPreviewInit = false;
+            try
+            {
+                await JS.InvokeVoidAsync("mnshor.initLazyPdfPreview", "pdf-to-images-grid", selectedFile.Data);
+            }
+            catch { }
+        }
+        else if (needsPreviewSync && selectedFile != null && options.Mode == PdfImageConversionMode.PagesToImages)
+        {
+            needsPreviewSync = false;
+            try
+            {
+                await JS.InvokeVoidAsync("mnshor.syncLazyThumbnails", "pdf-to-images-grid");
+            }
+            catch { }
+        }
+    }
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        lastResult = null;
+        var file = e.File;
+
+        isLoadingFile = true;
+        loadingFileName = file.Name;
+        StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            using var ms = new MemoryStream();
+            using var stream = file.OpenReadStream(maxAllowedSize: 500 * 1024 * 1024);
+            await stream.CopyToAsync(ms);
+            var data = ms.ToArray();
+
+            int pageCount = await Task.Run(() => PdfEngine.GetPageCount(data));
+            if (pageCount <= 0)
+            {
+                errorMessage = "Could not read pages from the selected PDF file.";
+                return;
+            }
+
+            selectedFile = new DocumentItem
+            {
+                FileName = file.Name,
+                ContentType = file.ContentType,
+                Size = file.Size,
+                Data = data,
+                PageCount = pageCount
+            };
+
+            currentGridPage = 1;
+            extractedImages.Clear();
+            extractedFormatCache = null;
+            SelectAllPages();
+            needsPreviewInit = true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading {file.Name}: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingFile = false;
+        }
+    }
+
+    private async Task SetModeAsync(PdfImageConversionMode mode)
+    {
+        if (options.Mode == mode) return;
+        options.Mode = mode;
+        errorMessage = null;
+        lastResult = null;
+
+        if (mode == PdfImageConversionMode.PagesToImages)
+        {
+            needsPreviewInit = true;
+        }
+        else if (selectedFile != null && extractedFormatCache != options.Format)
+        {
+            await ScanEmbeddedImagesAsync();
+        }
+    }
+
+    private async Task ChangeFormatAsync(ImageOutputFormat fmt)
+    {
+        if (options.Format == fmt) return;
+        options.Format = fmt;
+        if (options.Mode == PdfImageConversionMode.ExtractEmbeddedImages && selectedFile != null)
+        {
+            await ScanEmbeddedImagesAsync();
+        }
+    }
+
+    private async Task ScanEmbeddedImagesAsync()
+    {
+        if (selectedFile == null) return;
+
+        isScanningEmbedded = true;
+        scanProgressPercent = 5;
+        scanStepText = string.Empty;
+        StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            var progress = new Progress<(int Current, int Total)>(p =>
+            {
+                _ = InvokeAsync(() =>
+                {
+                    if (!isScanningEmbedded) return;
+                    scanProgressPercent = p.Total > 0 ? Math.Clamp((int)Math.Round((p.Current / (double)p.Total) * 100.0), 5, 100) : 50;
+                    scanStepText = $"{p.Current} / {p.Total}";
+                    StateHasChanged();
+                });
+            });
+
+            var found = await PdfImageConverter.ExtractEmbeddedImagesAsync(selectedFile.Data, options.Format, progress);
+            extractedImages = found.ToList();
+            extractedFormatCache = options.Format;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isScanningEmbedded = false;
+        }
+    }
+
+    private void SelectAllPages()
+    {
+        if (selectedFile == null) return;
+        options.SelectedPages = Enumerable.Range(1, selectedFile.PageCount).ToHashSet();
+    }
+
+    private void ClearPageSelection() => options.SelectedPages.Clear();
+
+    private void TogglePageSelection(int pageNum, bool selected)
+    {
+        if (selected) options.SelectedPages.Add(pageNum);
+        else options.SelectedPages.Remove(pageNum);
+    }
+
+    private void ApplyCustomRangeSelection()
+    {
+        if (selectedFile == null || string.IsNullOrWhiteSpace(options.CustomRange)) return;
+        var parsed = new HashSet<int>();
+        foreach (var part in options.CustomRange.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (part.Contains('-'))
+            {
+                var bounds = part.Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (bounds.Length == 2 && int.TryParse(bounds[0], out int s) && int.TryParse(bounds[1], out int e))
+                {
+                    int min = Math.Max(1, Math.Min(s, e));
+                    int max = Math.Min(selectedFile.PageCount, Math.Max(s, e));
+                    for (int p = min; p <= max; p++) parsed.Add(p);
+                }
+            }
+            else if (int.TryParse(part, out int single) && single >= 1 && single <= selectedFile.PageCount)
+            {
+                parsed.Add(single);
+            }
+        }
+
+        if (parsed.Count == 0)
+        {
+            errorMessage = Loc["InvalidRange"];
+            return;
+        }
+
+        errorMessage = null;
+        options.SelectedPages = parsed;
+    }
+
+    private Task GoToGridPageAsync(int gridPage)
+    {
+        currentGridPage = Math.Clamp(gridPage, 1, TotalGridPages);
+        needsPreviewSync = true;
+        return Task.CompletedTask;
+    }
+
+    private void SelectAllExtracted()
+    {
+        foreach (var img in extractedImages) img.IsSelected = true;
+    }
+
+    private void ClearExtractedSelection()
+    {
+        foreach (var img in extractedImages) img.IsSelected = false;
+    }
+
+    private async Task ExecutePagesToImagesAsync()
+    {
+        if (selectedFile == null || options.SelectedPages.Count == 0) return;
+
+        errorMessage = null;
+        isProcessing = true;
+        convertProgressPercent = 2;
+        convertStatusText = Loc["StageRenderingPages"];
+        StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            var pages = options.SelectedPages.OrderBy(p => p).ToList();
+            string mime = options.GetMimeType();
+            string ext = options.GetFileExtension();
+            float scale = options.GetRenderScale();
+            float quality = options.GetJpgQuality();
+            string baseName = Path.GetFileNameWithoutExtension(selectedFile.FileName);
+
+            await JS.InvokeAsync<int>("mnshor.openPdfForImages", selectedFile.Data);
+
+            var renderedList = new List<RenderedPdfPageImage>(pages.Count);
+            for (int i = 0; i < pages.Count; i++)
+            {
+                int pageNum = pages[i];
+                convertStatusText = $"{Loc["StageRenderingPages"]} ({i + 1}/{pages.Count})";
+                convertProgressPercent = Math.Clamp(5 + (int)Math.Round(((i + 1) / (double)pages.Count) * 80.0), 5, 85);
+                StateHasChanged();
+
+                var dto = await JS.InvokeAsync<JsRenderedPageImageDto?>(
+                    "mnshor.renderSinglePdfPageToImage",
+                    pageNum,
+                    scale,
+                    mime,
+                    quality);
+
+                if (dto != null && !string.IsNullOrEmpty(dto.ImageBase64))
+                {
+                    renderedList.Add(new RenderedPdfPageImage
+                    {
+                        PageNumber = dto.PageNumber,
+                        FileName = $"{baseName}_page_{dto.PageNumber:D3}.{ext}",
+                        MimeType = mime,
+                        Data = Convert.FromBase64String(dto.ImageBase64)
+                    });
+                }
+            }
+
+            convertStatusText = pages.Count > 1 ? Loc["StagePackagingZip"] : Loc["Processing"];
+            convertProgressPercent = 92;
+            StateHasChanged();
+
+            lastResult = await PdfImageConverter.PackageImagesAsync(selectedFile.FileName, renderedList, options.Format);
+            if (lastResult.Success)
+            {
+                convertProgressPercent = 100;
+                StateHasChanged();
+                await DownloadResultAsync(lastResult);
+            }
+            else
+            {
+                errorMessage = lastResult.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            try { await JS.InvokeVoidAsync("mnshor.closePdfForImages"); } catch { }
+            isProcessing = false;
+            convertProgressPercent = 0;
+            convertStatusText = string.Empty;
+        }
+    }
+
+    private async Task ExecuteDownloadExtractedAsync()
+    {
+        if (selectedFile == null) return;
+        var chosen = extractedImages.Where(x => x.IsSelected).ToList();
+        if (chosen.Count == 0) return;
+
+        errorMessage = null;
+        isProcessing = true;
+        convertProgressPercent = 40;
+        convertStatusText = chosen.Count > 1 ? Loc["StagePackagingZip"] : Loc["Processing"];
+        StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            var inputs = chosen.Select(x => new RenderedPdfPageImage
+            {
+                PageNumber = x.PageNumber,
+                FileName = x.FileName,
+                MimeType = x.MimeType,
+                Data = x.Data
+            }).ToList();
+
+            lastResult = await PdfImageConverter.PackageImagesAsync(selectedFile.FileName, inputs, options.Format);
+            if (lastResult.Success)
+            {
+                convertProgressPercent = 100;
+                StateHasChanged();
+                await DownloadResultAsync(lastResult);
+            }
+            else
+            {
+                errorMessage = lastResult.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+            convertProgressPercent = 0;
+            convertStatusText = string.Empty;
+        }
+    }
+
+    private async Task DownloadSingleExtractedAsync(ExtractedPdfImage img)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("mnshor.downloadFileFromByteArray", img.FileName, img.MimeType, img.Data);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task ResetFileAsync()
+    {
+        selectedFile = null;
+        extractedImages.Clear();
+        extractedFormatCache = null;
+        options.SelectedPages.Clear();
+        options.CustomRange = string.Empty;
+        lastResult = null;
+        errorMessage = null;
+        try { await JS.InvokeVoidAsync("mnshor.disposePdfPreview"); } catch { }
+    }
+
+    private async Task DownloadAgainAsync()
+    {
+        if (lastResult != null && lastResult.Success)
+        {
+            await DownloadResultAsync(lastResult);
+        }
+    }
+
+    private async Task DownloadResultAsync(ExecutionResult result)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("mnshor.downloadFileFromByteArray", result.OutputFileName, result.ContentType, result.OutputData);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private sealed class JsRenderedPageImageDto
+    {
+        public int PageNumber { get; set; }
+        public int WidthPx { get; set; }
+        public int HeightPx { get; set; }
+        public string ImageBase64 { get; set; } = string.Empty;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Loc.OnChange -= StateHasChanged;
+        try { await JS.InvokeVoidAsync("mnshor.disposePdfPreview"); } catch { }
+        try { await JS.InvokeVoidAsync("mnshor.closePdfForImages"); } catch { }
+    }
+}

@@ -25,6 +25,7 @@ public class EngineTests
     private readonly LocalWordConverter _wordConverter = new();
     private readonly LocalSpreadsheetMarkdownConverter _excelMdConverter = new();
     private readonly LocalPowerPointConverter _pptxConverter = new();
+    private readonly LocalPdfImageConverter _pdfImageConverter = new();
 
     private static byte[] CreateSamplePdf(int pageCount, string titlePrefix = "Doc")
     {
@@ -1598,5 +1599,144 @@ End of report.
         Assert.True(result.Success, result.ErrorMessage);
         Assert.NotEmpty(result.OutputData);
         Assert.Equal(2, _pdfEngine.GetPageCount(result.OutputData));
+    }
+
+    // =========================================================================
+    // PDF to Images Tests (Page Packaging + Embedded Image Extraction)
+    // =========================================================================
+
+    [Fact]
+    public async Task LocalPdfImageConverter_PackageSingleImage_ReturnsDirectImageFile()
+    {
+        byte[] jpgBytes;
+        using (var bmp = new SkiaSharp.SKBitmap(120, 80))
+        {
+            using (var c = new SkiaSharp.SKCanvas(bmp)) c.Clear(SkiaSharp.SKColors.CornflowerBlue);
+            using var img = SkiaSharp.SKImage.FromBitmap(bmp);
+            jpgBytes = img.Encode(SkiaSharp.SKEncodedImageFormat.Jpeg, 90).ToArray();
+        }
+
+        var res = await _pdfImageConverter.PackageImagesAsync(
+            "Report.pdf",
+            new[]
+            {
+                new RenderedPdfPageImage
+                {
+                    PageNumber = 1,
+                    FileName = "Report_page_001.jpg",
+                    MimeType = "image/jpeg",
+                    Data = jpgBytes
+                }
+            },
+            ImageOutputFormat.Jpg);
+
+        Assert.True(res.Success, res.ErrorMessage);
+        Assert.Equal("Report_page_001.jpg", res.OutputFileName);
+        Assert.Equal("image/jpeg", res.ContentType);
+        Assert.Equal(jpgBytes, res.OutputData);
+    }
+
+    [Fact]
+    public async Task LocalPdfImageConverter_PackageMultipleImages_ReturnsValidZipArchive()
+    {
+        byte[] pngBytes;
+        using (var bmp = new SkiaSharp.SKBitmap(64, 64))
+        {
+            using (var c = new SkiaSharp.SKCanvas(bmp)) c.Clear(SkiaSharp.SKColors.Teal);
+            using var img = SkiaSharp.SKImage.FromBitmap(bmp);
+            pngBytes = img.Encode(SkiaSharp.SKEncodedImageFormat.Png, 90).ToArray();
+        }
+
+        var inputs = new[]
+        {
+            new RenderedPdfPageImage { PageNumber = 1, FileName = "Deck_page_001.png", MimeType = "image/png", Data = pngBytes },
+            new RenderedPdfPageImage { PageNumber = 2, FileName = "Deck_page_002.png", MimeType = "image/png", Data = pngBytes },
+            new RenderedPdfPageImage { PageNumber = 3, FileName = "Deck_page_003.png", MimeType = "image/png", Data = pngBytes }
+        };
+
+        var res = await _pdfImageConverter.PackageImagesAsync("Deck.pdf", inputs, ImageOutputFormat.Png);
+
+        Assert.True(res.Success, res.ErrorMessage);
+        Assert.Equal("application/zip", res.ContentType);
+        Assert.EndsWith(".zip", res.OutputFileName, StringComparison.OrdinalIgnoreCase);
+
+        using var zipMs = new MemoryStream(res.OutputData, writable: false);
+        using var zip = new ZipArchive(zipMs, ZipArchiveMode.Read);
+        Assert.Equal(3, zip.Entries.Count);
+        Assert.Contains(zip.Entries, e => e.Name == "Deck_page_001.png");
+        Assert.Contains(zip.Entries, e => e.Name == "Deck_page_002.png");
+        Assert.Contains(zip.Entries, e => e.Name == "Deck_page_003.png");
+    }
+
+    [Fact]
+    public async Task LocalPdfImageConverter_ExtractEmbeddedImages_ExtractsJpegAndRgbImages()
+    {
+        // Create a 2-page PDF embedding a JPEG on page 1 and a PNG (RGB + alpha) on page 2
+        byte[] jpgBytes;
+        using (var bmp = new SkiaSharp.SKBitmap(100, 60))
+        {
+            using (var c = new SkiaSharp.SKCanvas(bmp)) c.Clear(SkiaSharp.SKColors.DarkOrange);
+            using var img = SkiaSharp.SKImage.FromBitmap(bmp);
+            jpgBytes = img.Encode(SkiaSharp.SKEncodedImageFormat.Jpeg, 90).ToArray();
+        }
+
+        byte[] pngBytes;
+        using (var bmp = new SkiaSharp.SKBitmap(80, 80))
+        {
+            using (var c = new SkiaSharp.SKCanvas(bmp))
+            {
+                c.Clear(SkiaSharp.SKColors.Transparent);
+                using var p = new SkiaSharp.SKPaint { Color = SkiaSharp.SKColors.MediumSeaGreen, IsAntialias = true };
+                c.DrawCircle(40, 40, 30, p);
+            }
+            using var img = SkiaSharp.SKImage.FromBitmap(bmp);
+            pngBytes = img.Encode(SkiaSharp.SKEncodedImageFormat.Png, 95).ToArray();
+        }
+
+        byte[] pdfBytes;
+        using (var doc = new PdfDocument())
+        {
+            var p1 = doc.AddPage();
+            using (var gfx = XGraphics.FromPdfPage(p1))
+            using (var jMs = new MemoryStream(jpgBytes))
+            using (var xImg = XImage.FromStream(jMs))
+            {
+                gfx.DrawImage(xImg, 40, 40, 200, 120);
+            }
+
+            var p2 = doc.AddPage();
+            using (var gfx = XGraphics.FromPdfPage(p2))
+            using (var pMs = new MemoryStream(pngBytes))
+            using (var xImg = XImage.FromStream(pMs))
+            {
+                gfx.DrawImage(xImg, 40, 40, 160, 160);
+            }
+
+            using var outMs = new MemoryStream();
+            doc.Save(outMs, false);
+            pdfBytes = outMs.ToArray();
+        }
+
+        var extracted = await _pdfImageConverter.ExtractEmbeddedImagesAsync(pdfBytes, ImageOutputFormat.Png);
+
+        Assert.Equal(2, extracted.Count);
+        Assert.Equal(1, extracted[0].PageNumber);
+        Assert.Equal(100, extracted[0].Width);
+        Assert.Equal(60, extracted[0].Height);
+        Assert.NotEmpty(extracted[0].Data);
+        Assert.StartsWith("data:image/png;base64,", extracted[0].PreviewDataUrl);
+
+        Assert.Equal(2, extracted[1].PageNumber);
+        Assert.Equal(80, extracted[1].Width);
+        Assert.Equal(80, extracted[1].Height);
+        Assert.NotEmpty(extracted[1].Data);
+    }
+
+    [Fact]
+    public async Task LocalPdfImageConverter_ExtractFromTextOnlyPdf_ReturnsEmptyListSafely()
+    {
+        var textOnlyPdf = CreateSamplePdf(2, "NoImages");
+        var extracted = await _pdfImageConverter.ExtractEmbeddedImagesAsync(textOnlyPdf, ImageOutputFormat.Jpg);
+        Assert.Empty(extracted);
     }
 }
