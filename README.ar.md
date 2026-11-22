@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml/badge.svg)](https://github.com/amdnaji/mnshor/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/amdnaji/mnshor?include_prereleases&label=Release)](https://github.com/amdnaji/mnshor/releases)
-[![Version](https://img.shields.io/badge/Version-0.3.0--alpha-D4A359)](#)
+[![Version](https://img.shields.io/badge/Version-0.4.0--alpha-D4A359)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET 11.0](https://img.shields.io/badge/.NET-11.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Cross--Platform%20Web-0078D6)](#طريقة-التشغيل-والبناء-من-المصدر)
@@ -130,7 +130,7 @@ dotnet tool install --global wix
 wix extension add -g WixToolset.UI.wixext
 
 # بناء ملف الـ MSI داخل مجلد ./dist/
-.\installer\build-msi.ps1 -Version 0.3.0 -Stage alpha
+.\installer\build-msi.ps1 -Version 0.4.0 -Stage alpha
 ```
 
 <div dir="rtl">
