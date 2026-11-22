@@ -572,3 +572,74 @@ window.mnshor.renderPdfPagesForPptx = async function (byteArray, pageNumbers, sc
     }
     return results;
 };
+
+// =========================================================================
+// PDF to Images (JPG / PNG / WebP): Page-by-Page High-DPI Renderer via PDF.js
+// =========================================================================
+window.mnshor._imgPdfTask = null;
+window.mnshor._imgPdfDoc = null;
+
+window.mnshor.openPdfForImages = async function (byteArray) {
+    await window.mnshor.closePdfForImages();
+    await window.mnshor._ensurePdfJsReady();
+
+    const uint8 = new Uint8Array(byteArray);
+    const loadingTask = window.pdfjsLib.getDocument({
+        data: uint8,
+        wasmUrl: window.mnshor.pdfWasmUrl || '/js/pdfjs/wasm/'
+    });
+    window.mnshor._imgPdfTask = loadingTask;
+    window.mnshor._imgPdfDoc = await loadingTask.promise;
+    return window.mnshor._imgPdfDoc.numPages;
+};
+
+window.mnshor.renderSinglePdfPageToImage = async function (pageNum, scale, mimeType, quality) {
+    const pdfDoc = window.mnshor._imgPdfDoc;
+    if (!pdfDoc) throw new Error('PDF document is not open');
+    if (pageNum < 1 || pageNum > pdfDoc.numPages) return null;
+
+    const renderScale = scale && scale > 0 ? scale : 2.08;
+    const targetMime = mimeType || 'image/jpeg';
+    const targetQuality = (typeof quality === 'number' && quality > 0 && quality <= 1) ? quality : 0.9;
+
+    const page = await pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: renderScale });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    const ctx = canvas.getContext('2d');
+
+    // Fill white background for JPEG (and default PDF white page) so transparent areas never turn black
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    await page.render({
+        canvas: canvas,
+        canvasContext: ctx,
+        viewport: viewport
+    }).promise;
+
+    const dataUrl = targetMime === 'image/png'
+        ? canvas.toDataURL('image/png')
+        : canvas.toDataURL(targetMime, targetQuality);
+
+    const commaIdx = dataUrl.indexOf(',');
+    const base64 = commaIdx >= 0 ? dataUrl.substring(commaIdx + 1) : '';
+
+    return {
+        pageNumber: pageNum,
+        widthPx: canvas.width,
+        heightPx: canvas.height,
+        imageBase64: base64
+    };
+};
+
+window.mnshor.closePdfForImages = async function () {
+    const task = window.mnshor._imgPdfTask;
+    window.mnshor._imgPdfTask = null;
+    window.mnshor._imgPdfDoc = null;
+    if (task && typeof task.destroy === 'function') {
+        try { await task.destroy(); } catch { }
+    }
+};

@@ -32,6 +32,7 @@ builder.Services.AddSingleton<IPdfEngine, FastPdfEngine>();
 builder.Services.AddSingleton<IWordConverter, LocalWordConverter>();
 builder.Services.AddSingleton<ISpreadsheetMarkdownConverter, LocalSpreadsheetMarkdownConverter>();
 builder.Services.AddSingleton<IPowerPointConverter, LocalPowerPointConverter>();
+builder.Services.AddSingleton<IPdfImageConverter, LocalPdfImageConverter>();
 builder.Services.AddSingleton<OsFontService>();
 
 PdfSharp.Fonts.GlobalFontSettings.FontResolver ??= new SystemFontResolver();
