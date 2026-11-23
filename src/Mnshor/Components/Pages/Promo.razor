@@ -16,14 +16,19 @@
         <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
             <div class="promo-reel-switcher" role="tablist" aria-label="Promo Reels">
                 <button type="button"
-                        class="promo-reel-tab @(_reelMode == PromoReel.Suite ? "active" : "")"
-                        @onclick="() => SwitchReel(PromoReel.Suite)">
-                    @(Loc.IsRtl ? "نظرة عامة" : "Suite Overview")
+                        class="promo-reel-tab @(_reelMode == PromoReel.MediaSlides ? "active" : "")"
+                        @onclick="() => SwitchReel(PromoReel.MediaSlides)">
+                    @(Loc.IsRtl ? "العروض والصور (جديد)" : "Media & Slides (New)")
                 </button>
                 <button type="button"
                         class="promo-reel-tab @(_reelMode == PromoReel.SignPdf ? "active" : "")"
                         @onclick="() => SwitchReel(PromoReel.SignPdf)">
                     @(Loc.IsRtl ? "محاكاة التوقيع (/sign)" : "Sign PDF (/sign)")
+                </button>
+                <button type="button"
+                        class="promo-reel-tab @(_reelMode == PromoReel.Suite ? "active" : "")"
+                        @onclick="() => SwitchReel(PromoReel.Suite)">
+                    @(Loc.IsRtl ? "نظرة عامة" : "Suite Overview")
                 </button>
             </div>
 
@@ -39,7 +44,254 @@
         <div class="promo-grid-bg"></div>
         <div class="promo-prism-beam"></div>
 
-        @if (_reelMode == PromoReel.Suite)
+        @if (_reelMode == PromoReel.MediaSlides)
+        {
+            var cinemaClass = IsSceneExiting ? "promo-scene scene-cinematic scene-exiting" : "promo-scene scene-cinematic";
+
+            @if (_currentScene == 1)
+            {
+                <div @key="@("media-1")" class="@cinemaClass">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "سيادة البيانات • محركات التحويل الجديدة" : "DATA SOVEREIGNTY • NEW CONVERSION ENGINES")</span>
+                    <MnshorLogo Size="108" Animated="true" />
+                    <h2 class="promo-title-xl">@(Loc.IsRtl ? "مستنداتك. تحت سيادتك الكاملة." : "Your Documents. Your Sovereignty.")</h2>
+                    <p class="promo-lead">@(Loc.IsRtl ? "تحويل عروض PowerPoint والصور وملفات PDF محلياً 100% داخل الذاكرة دون أي رفع سحابي" : "Bidirectional PowerPoint & Image conversion — 100% local, in-memory, and zero cloud")</p>
+                </div>
+            }
+            else if (_currentScene == 2)
+            {
+                <div @key="@("media-2")" class="@cinemaClass">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "سيادة البيانات أولاً" : "UNCOMPROMISING DATA SOVEREIGNTY")</span>
+                    <div class="sov-vault">
+                        <div class="sov-ring-outer"></div>
+                        <div class="sov-ring-mid"></div>
+                        <div class="sov-core">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                <polyline points="9 12 11 14 15 10"></polyline>
+                            </svg>
+                        </div>
+                        <span class="sov-orbit-tag t1">PPTX</span>
+                        <span class="sov-orbit-tag t2">PDF</span>
+                        <span class="sov-orbit-tag t3">PNG</span>
+                        <span class="sov-orbit-tag t4">JPG / WebP</span>
+                    </div>
+                    <h2 class="promo-title-xl" style="margin-top: 0.2rem;">@(Loc.IsRtl ? "بياناتك لا تغادر جهازك أبداً" : "Zero Cloud. Zero Leaks. 100% Local.")</h2>
+                    <div class="promo-pills-row">
+                        <span class="promo-chip">@(Loc.IsRtl ? "معالجة 100% في RAM" : "100% In-Memory RAM")</span>
+                        <span class="promo-chip">@(Loc.IsRtl ? "بدون ملفات مؤقتة على القرص" : "Zero Disk Temp Files")</span>
+                        <span class="promo-chip">@(Loc.IsRtl ? "جاهز للبيئات المعزولة" : "Air-Gapped Ready")</span>
+                    </div>
+                </div>
+            }
+            else if (_currentScene == 3)
+            {
+                <div @key="@("media-3")" class="@cinemaClass">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "تحويل العروض التقديمية • /pptx-to-pdf" : "PRESENTATION ENGINE • /pptx-to-pdf")</span>
+                    <h2 class="promo-title-xl" style="margin-top: 0;">@(Loc.IsRtl ? "من PowerPoint (.pptx) إلى PDF" : "PPTX to Crisp, Print-Ready PDF")</h2>
+                    <div class="conv-pipeline">
+                        <div class="conv-slide-stack">
+                            <div class="conv-slide-card s-back">
+                                <span class="conv-slide-label">SLIDE 03</span>
+                                <div class="conv-slide-bar" style="width: 75%;"></div>
+                            </div>
+                            <div class="conv-slide-card s-mid">
+                                <span class="conv-slide-label">SLIDE 02</span>
+                                <div class="conv-slide-bar" style="width: 85%;"></div>
+                            </div>
+                            <div class="conv-slide-card s-front">
+                                <span class="conv-slide-label">PPTX • 16:9</span>
+                                <div class="conv-slide-bar" style="width: 90%; background: #F59E0B;"></div>
+                                <div class="conv-slide-bar" style="width: 64%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="conv-prism-node">@(Loc.IsRtl ? "←" : "→")</div>
+
+                        <div class="conv-pdf-card">
+                            <span class="conv-pdf-badge">PDF</span>
+                            <div class="conv-pdf-lines">
+                                <div class="conv-pdf-line" style="width: 88%;"></div>
+                                <div class="conv-pdf-line" style="width: 72%;"></div>
+                                <div class="conv-pdf-line" style="width: 94%;"></div>
+                                <div class="conv-pdf-line" style="width: 60%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="promo-pills-row">
+                        <span class="promo-chip">@(Loc.IsRtl ? "دعم كامل للعربية (RTL)" : "Native Arabic RTL Shaping")</span>
+                        <span class="promo-chip">@(Loc.IsRtl ? "بدون الحاجة لـ Office" : "No Office Installed Needed")</span>
+                    </div>
+                </div>
+            }
+            else if (_currentScene == 4)
+            {
+                <div @key="@("media-4")" class="@cinemaClass">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "تحويل عكسي ذكي • /pdf-to-pptx" : "REVERSE PRESENTATION ENGINE • /pdf-to-pptx")</span>
+                    <h2 class="promo-title-xl" style="margin-top: 0;">@(Loc.IsRtl ? "من PDF إلى عروض PowerPoint (.pptx)" : "PDF Pages Back to PowerPoint Slides")</h2>
+                    <div class="conv-pipeline">
+                        <div class="conv-pdf-card">
+                            <span class="conv-pdf-badge">PDF</span>
+                            <div class="conv-pdf-lines">
+                                <div class="conv-pdf-line" style="width: 90%;"></div>
+                                <div class="conv-pdf-line" style="width: 76%;"></div>
+                                <div class="conv-pdf-line" style="width: 84%;"></div>
+                                <div class="conv-pdf-line" style="width: 55%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="conv-prism-node">@(Loc.IsRtl ? "←" : "→")</div>
+
+                        <div class="conv-slide-stack">
+                            <div class="conv-slide-card s-back">
+                                <span class="conv-slide-label">SLIDE 03</span>
+                                <div class="conv-slide-bar" style="width: 70%;"></div>
+                            </div>
+                            <div class="conv-slide-card s-mid">
+                                <span class="conv-slide-label">SLIDE 02</span>
+                                <div class="conv-slide-bar" style="width: 85%;"></div>
+                            </div>
+                            <div class="conv-slide-card s-front">
+                                <span class="conv-slide-label">PPTX READY</span>
+                                <div class="conv-slide-bar" style="width: 92%; background: #3CA374;"></div>
+                                <div class="conv-slide-bar" style="width: 68%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="promo-pills-row">
+                        <span class="promo-chip">@(Loc.IsRtl ? "شرائح 16:9 عالية الدقة" : "High-Res 16:9 Slides")</span>
+                        <span class="promo-chip">@(Loc.IsRtl ? "تجميع فوري داخل الذاكرة" : "Packaged Instantly in RAM")</span>
+                    </div>
+                </div>
+            }
+            else if (_currentScene == 5)
+            {
+                <div @key="@("media-5")" class="@cinemaClass">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "استخراج وتصدير الصور • /pdf-to-images" : "HIGH-DPI IMAGE EXPORT • /pdf-to-images")</span>
+                    <h2 class="promo-title-xl" style="margin-top: 0;">@(Loc.IsRtl ? "تحويل PDF إلى صور عالية الدقة" : "PDF to JPG, PNG & WebP Images")</h2>
+                    <div class="conv-pipeline">
+                        <div class="conv-pdf-card">
+                            <span class="conv-pdf-badge">PDF</span>
+                            <div class="conv-pdf-lines">
+                                <div class="conv-pdf-line" style="width: 86%;"></div>
+                                <div class="conv-pdf-line" style="width: 92%;"></div>
+                                <div class="conv-pdf-line" style="width: 66%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="conv-prism-node">@(Loc.IsRtl ? "←" : "→")</div>
+
+                        <div class="conv-img-fan">
+                            <div class="conv-img-frame">
+                                <div class="conv-img-art" style="--art-a: #F97316; --art-b: #DC2626;"></div>
+                                <div class="conv-img-ext">JPG</div>
+                            </div>
+                            <div class="conv-img-frame">
+                                <div class="conv-img-art" style="--art-a: #34D399; --art-b: #059669;"></div>
+                                <div class="conv-img-ext">PNG</div>
+                            </div>
+                            <div class="conv-img-frame">
+                                <div class="conv-img-art" style="--art-a: #60A5FA; --art-b: #2563EB;"></div>
+                                <div class="conv-img-ext">WebP</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="promo-pills-row">
+                        <span class="promo-chip">@(Loc.IsRtl ? "تحويل الصفحات أو استخراج الصور المضمنة" : "Page Render & Embedded Image Extraction")</span>
+                        <span class="promo-chip">@(Loc.IsRtl ? "تنزيل فوري كـ ZIP" : "In-Memory ZIP Bundle")</span>
+                    </div>
+                </div>
+            }
+            else if (_currentScene == 6)
+            {
+                <div @key="@("media-6")" class="@cinemaClass">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "تجميع الصور في مستند • /images-to-pdf" : "VISUAL PDF BUILDER • /images-to-pdf")</span>
+                    <h2 class="promo-title-xl" style="margin-top: 0;">@(Loc.IsRtl ? "تحويل الصور إلى ملف PDF احترافي" : "Images to Polished PDF in Seconds")</h2>
+                    <div class="conv-pipeline">
+                        <div class="conv-img-fan">
+                            <div class="conv-img-frame">
+                                <div class="conv-img-art" style="--art-a: #FBBF24; --art-b: #D97706;"></div>
+                                <div class="conv-img-ext">JPG</div>
+                            </div>
+                            <div class="conv-img-frame">
+                                <div class="conv-img-art" style="--art-a: #38BDF8; --art-b: #0284C7;"></div>
+                                <div class="conv-img-ext">PNG</div>
+                            </div>
+                            <div class="conv-img-frame">
+                                <div class="conv-img-art" style="--art-a: #A78BFA; --art-b: #7C3AED;"></div>
+                                <div class="conv-img-ext">WebP</div>
+                            </div>
+                        </div>
+
+                        <div class="conv-prism-node">@(Loc.IsRtl ? "←" : "→")</div>
+
+                        <div class="conv-pdf-card">
+                            <span class="conv-pdf-badge">PDF</span>
+                            <div class="conv-pdf-lines">
+                                <div class="conv-pdf-line" style="width: 92%; background: #D4A359;"></div>
+                                <div class="conv-pdf-line" style="width: 80%;"></div>
+                                <div class="conv-pdf-line" style="width: 88%;"></div>
+                                <div class="conv-pdf-line" style="width: 64%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="promo-pills-row">
+                        <span class="promo-chip">@(Loc.IsRtl ? "دمج في ملف PDF واحد" : "Merge All into One PDF")</span>
+                        <span class="promo-chip">@(Loc.IsRtl ? "تحكم بالمقاس والاتجاه والهوامش" : "Page Size, Orientation & Margins")</span>
+                    </div>
+                </div>
+            }
+            else if (_currentScene == 7)
+            {
+                <div @key="@("media-7")" class="@cinemaClass">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "لماذا مَنشُور أفضل من الأدوات الأخرى؟" : "WHY MNSHOR BEATS CLOUD PDF TOOLS")</span>
+                    <h2 class="promo-title-xl" style="font-size: clamp(1.45rem, 3.1vw, 2.3rem); margin-top: 0;">
+                        @(Loc.IsRtl ? "الخيار الأذكى والأكثر أماناً لمستنداتك" : "Built Different. Built for Privacy & Speed.")
+                    </h2>
+                    <div class="why-grid">
+                        <div class="why-card">
+                            <div class="why-card-title">🛡️ @(Loc.IsRtl ? "سيادة بيانات حقيقية (بدون سحابة)" : "True Data Sovereignty")</div>
+                            <div class="why-card-desc">@(Loc.IsRtl ? "الأدوات السحابية ترفع ملفاتك لخوادم خارجية؛ مَنشُور يعالجها 100% في ذاكرة جهازك." : "Cloud sites upload sensitive files to remote servers. Mnshor processes 100% in local RAM.")</div>
+                        </div>
+                        <div class="why-card">
+                            <div class="why-card-title">♾️ @(Loc.IsRtl ? "بدون اشتراكات أو حدود يومية" : "Zero Paywalls or Daily Limits")</div>
+                            <div class="why-card-desc">@(Loc.IsRtl ? "لا حدود لعدد الملفات، لا قيود حجم مدفوعة، ولا علامات مائية إجبارية." : "No daily task caps, no file-size paywalls, and no forced watermarks—ever.")</div>
+                        </div>
+                        <div class="why-card">
+                            <div class="why-card-title">🔓 @(Loc.IsRtl ? "مفتوح المصدر 100% (MIT)" : "100% Open Source (MIT)")</div>
+                            <div class="why-card-desc">@(Loc.IsRtl ? "كود برمجي شفاف بالكامل على GitHub يمكنك فحصه والاعتماد عليه واستضافته محلياً." : "Fully transparent, auditable code on GitHub—verify every line or self-host anywhere.")</div>
+                        </div>
+                        <div class="why-card">
+                            <div class="why-card-title">⚡ @(Loc.IsRtl ? "دعم أصيل للعربية وسرعة بلا إنترنت" : "Native Arabic RTL & Offline Speed")</div>
+                            <div class="why-card-desc">@(Loc.IsRtl ? "تشكيل عربي احترافي (HarfBuzz) ومعالجة فورية بالملي ثانية حتى بدون اتصال إنترنت." : "First-class Arabic shaping (HarfBuzz) and millisecond execution—even completely offline.")</div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div @key="@("media-8")" class="@cinemaClass">
+                    <span class="promo-kicker">@(Loc.IsRtl ? "مفتوح المصدر بالكامل • رخصة MIT" : "100% OPEN SOURCE • MIT LICENSE")</span>
+                    <MnshorLogo Size="88" Animated="true" />
+                    <h2 class="promo-title-xl" style="font-size: clamp(1.6rem, 3.6vw, 2.65rem);">@(Loc.IsRtl ? "محلي 100%. مفتوح المصدر. ملكك." : "100% Local. Open Source. Yours.")</h2>
+                    <div class="finale-engines-grid">
+                        <span class="finale-engine-pill">PPTX → PDF</span>
+                        <span class="finale-engine-pill">PDF → PPTX</span>
+                        <span class="finale-engine-pill">@(Loc.IsRtl ? "PDF → صور" : "PDF → Images")</span>
+                        <span class="finale-engine-pill">@(Loc.IsRtl ? "صور → PDF" : "Images → PDF")</span>
+                    </div>
+                    <div class="promo-finale-actions">
+                        <a href="https://github.com/amdnaji/mnshor" target="_blank" rel="noopener noreferrer" class="promo-github-pill" dir="ltr">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M12 0.297C5.37 0.297 0 5.67 0 12.297c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+                            </svg>
+                            <span>github.com/amdnaji/mnshor</span>
+                        </a>
+                        <a href="/" class="promo-cta-btn" style="margin-top: 0;">@(Loc.IsRtl ? "استكشف جميع الأدوات" : "Explore Mnshor Suite")</a>
+                    </div>
+                </div>
+            }
+        }
+        else if (_reelMode == PromoReel.Suite)
         {
             @if (_currentScene == 1)
             {
@@ -362,21 +614,44 @@
 </div>
 
 @code {
-    private enum PromoReel { Suite, SignPdf }
+    private enum PromoReel { MediaSlides, SignPdf, Suite }
 
+    private static readonly double[] MediaSceneStarts = [0.0, 4.5, 9.0, 13.5, 18.0, 22.5, 27.5, 32.5];
     private static readonly double[] SuiteSceneStarts = [0.0, 4.0, 8.0, 13.0, 17.5];
     private static readonly double[] SignSceneStarts = [0.0, 4.0, 8.5, 13.5, 19.0, 22.5, 26.5];
 
-    private PromoReel _reelMode = PromoReel.SignPdf;
+    private PromoReel _reelMode = PromoReel.MediaSlides;
     private double _elapsedSeconds = 0.0;
     private int _currentScene = 1;
     private bool _isPlaying = true;
     private System.Timers.Timer? _timer;
     private int _lastRenderedSignScene = 0;
 
-    private int SceneCount => _reelMode == PromoReel.Suite ? 5 : 7;
-    private double TotalDurationSeconds => _reelMode == PromoReel.Suite ? 22.0 : 30.0;
+    private int SceneCount => _reelMode switch
+    {
+        PromoReel.MediaSlides => 8,
+        PromoReel.SignPdf => 7,
+        _ => 5
+    };
+    private double TotalDurationSeconds => _reelMode switch
+    {
+        PromoReel.MediaSlides => 37.0,
+        PromoReel.SignPdf => 30.0,
+        _ => 22.0
+    };
     private double ProgressPercent => Math.Clamp((_elapsedSeconds / TotalDurationSeconds) * 100.0, 0.0, 100.0);
+
+    private bool IsSceneExiting
+    {
+        get
+        {
+            if (!_isPlaying || _reelMode != PromoReel.MediaSlides) return false;
+            double sceneEnd = _currentScene < MediaSceneStarts.Length
+                ? MediaSceneStarts[_currentScene]
+                : TotalDurationSeconds;
+            return (sceneEnd - _elapsedSeconds) <= 0.45 && (sceneEnd - _elapsedSeconds) > 0.0;
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -426,6 +701,18 @@
 
     private int ComputeScene(double t)
     {
+        if (_reelMode == PromoReel.MediaSlides)
+        {
+            if (t < 4.5) return 1;
+            if (t < 9.0) return 2;
+            if (t < 13.5) return 3;
+            if (t < 18.0) return 4;
+            if (t < 22.5) return 5;
+            if (t < 27.5) return 6;
+            if (t < 32.5) return 7;
+            return 8;
+        }
+
         if (_reelMode == PromoReel.Suite)
         {
             if (t < 4.0) return 1;
@@ -467,7 +754,12 @@
     private void JumpToScene(int scene)
     {
         if (scene < 1 || scene > SceneCount) return;
-        var starts = _reelMode == PromoReel.Suite ? SuiteSceneStarts : SignSceneStarts;
+        var starts = _reelMode switch
+        {
+            PromoReel.MediaSlides => MediaSceneStarts,
+            PromoReel.Suite => SuiteSceneStarts,
+            _ => SignSceneStarts
+        };
         _elapsedSeconds = starts[scene - 1];
         _currentScene = scene;
     }

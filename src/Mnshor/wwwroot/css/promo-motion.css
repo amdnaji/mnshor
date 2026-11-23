@@ -740,3 +740,406 @@
 .sim-feature-text strong {
     color: #5E3822;
 }
+
+
+/* ==========================================================================
+   Cinematic Fade-In / Fade-Out & Zoom-In / Zoom-Out (Media & Slides Reel)
+   ========================================================================== */
+
+.promo-scene.scene-cinematic {
+    animation:
+        cinemaZoomFadeIn 0.72s cubic-bezier(0.22, 1, 0.36, 1) both,
+        cinemaAmbientZoom 5.2s 0.72s ease-in-out forwards;
+    will-change: transform, opacity, filter;
+}
+
+.promo-scene.scene-cinematic.scene-exiting {
+    animation: cinemaZoomFadeOut 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+}
+
+@keyframes cinemaZoomFadeIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.90) translateY(14px);
+        filter: blur(6px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        filter: blur(0);
+    }
+}
+
+@keyframes cinemaAmbientZoom {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.028); }
+}
+
+@keyframes cinemaZoomFadeOut {
+    0% {
+        opacity: 1;
+        transform: scale(1.02);
+        filter: blur(0);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.08);
+        filter: blur(7px);
+    }
+}
+
+/* Scene 2: Data Sovereignty Concentric Vault */
+.sov-vault {
+    position: relative;
+    width: 240px;
+    height: 170px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0.35rem 0 0.5rem 0;
+}
+
+.sov-ring-outer {
+    position: absolute;
+    width: 170px;
+    height: 170px;
+    border-radius: 50%;
+    border: 1.5px dashed rgba(5, 150, 105, 0.42);
+    animation: sovSpinSlow 18s linear infinite;
+}
+
+.sov-ring-mid {
+    position: absolute;
+    width: 128px;
+    height: 128px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(212, 163, 89, 0.55);
+    background: radial-gradient(circle, rgba(236, 253, 245, 0.72) 0%, rgba(255, 253, 248, 0.15) 75%);
+    animation: promoPulseRing 2.6s ease-in-out infinite;
+}
+
+.sov-core {
+    position: relative;
+    z-index: 2;
+    width: 78px;
+    height: 78px;
+    border-radius: 22px;
+    background: linear-gradient(145deg, #065F46, #047857);
+    border: 2px solid #A7F3D0;
+    color: #ECFDF5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 14px 28px rgba(4, 120, 87, 0.28);
+    animation: promoCardPop 0.6s 0.12s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sov-orbit-tag {
+    position: absolute;
+    z-index: 3;
+    background: #FFFFFF;
+    border: 1.5px solid #D8C5A5;
+    color: #3F2313;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 0.22rem 0.55rem;
+    border-radius: 8px;
+    box-shadow: 0 6px 14px rgba(58, 32, 17, 0.12);
+    animation: sovTagFloat 3s ease-in-out infinite;
+}
+
+.sov-orbit-tag.t1 { top: 8px; left: 4px; border-color: #E04F3E; color: #B91C1C; animation-delay: 0s; }
+.sov-orbit-tag.t2 { top: 8px; right: 4px; border-color: #2E78D2; color: #1D4ED8; animation-delay: 0.45s; }
+.sov-orbit-tag.t3 { bottom: 8px; left: 10px; border-color: #3CA374; color: #047857; animation-delay: 0.9s; }
+.sov-orbit-tag.t4 { bottom: 8px; right: 10px; border-color: #D4A359; color: #8C5D16; animation-delay: 1.35s; }
+
+@keyframes sovSpinSlow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes sovTagFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+/* Scenes 3, 4, 5, 6: Bidirectional Conversion Pipeline */
+.conv-pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.35rem;
+    margin-top: 1.15rem;
+    flex-wrap: wrap;
+}
+
+.conv-slide-stack {
+    position: relative;
+    width: 158px;
+    height: 106px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.conv-slide-card {
+    position: absolute;
+    width: 138px;
+    height: 86px;
+    border-radius: 10px;
+    background: #FFFFFF;
+    border: 1.5px solid #E5B9A8;
+    border-top: 5px solid #D9532F;
+    box-shadow: 0 10px 20px rgba(58, 32, 17, 0.13);
+    padding: 0.55rem 0.7rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: start;
+}
+
+.conv-slide-card.s-back {
+    transform: translate(-12px, -9px) rotate(-5deg);
+    opacity: 0.72;
+    animation: promoCardPop 0.5s 0.08s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.conv-slide-card.s-mid {
+    transform: translate(-5px, -4px) rotate(-2deg);
+    opacity: 0.88;
+    animation: promoCardPop 0.5s 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.conv-slide-card.s-front {
+    transform: translate(4px, 4px);
+    animation: promoCardPop 0.55s 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.conv-slide-bar {
+    height: 6px;
+    border-radius: 99px;
+    background: #F3D5C8;
+}
+
+.conv-slide-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #C2410C;
+    letter-spacing: 0.04em;
+}
+
+.conv-prism-node {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #5E3822, #3F2313);
+    border: 2px solid #D4A359;
+    color: #FAF4E8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    font-weight: 800;
+    box-shadow: 0 12px 24px rgba(58, 32, 17, 0.22);
+    animation: convPrismGlow 2.2s ease-in-out infinite;
+}
+
+@keyframes convPrismGlow {
+    0%, 100% { transform: scale(1); box-shadow: 0 10px 22px rgba(212, 163, 89, 0.28); }
+    50% { transform: scale(1.07); box-shadow: 0 14px 30px rgba(212, 163, 89, 0.48); }
+}
+
+.conv-pdf-card {
+    width: 112px;
+    height: 136px;
+    border-radius: 12px;
+    background: linear-gradient(160deg, #FFFFFF, #FAF4E8);
+    border: 2px solid #6D4C36;
+    box-shadow: 0 14px 28px rgba(58, 32, 17, 0.16);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    animation: promoCardPop 0.6s 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.conv-pdf-badge {
+    background: #DC2626;
+    color: #FFFFFF;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 0.18rem 0.5rem;
+    border-radius: 6px;
+    letter-spacing: 0.04em;
+}
+
+.conv-pdf-lines {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.conv-pdf-line {
+    height: 5px;
+    border-radius: 99px;
+    background: #D6C4AA;
+}
+
+/* Fanned Image Frames (PDF <-> Images) */
+.conv-img-fan {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+}
+
+.conv-img-frame {
+    width: 78px;
+    height: 94px;
+    border-radius: 10px;
+    background: #FFFFFF;
+    border: 1.5px solid #D8C5A5;
+    padding: 0.42rem;
+    box-shadow: 0 10px 20px rgba(58, 32, 17, 0.13);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    animation: promoCardPop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.conv-img-frame:nth-child(1) { transform: rotate(-5deg); animation-delay: 0.14s; }
+.conv-img-frame:nth-child(2) { transform: translateY(-6px); animation-delay: 0.24s; }
+.conv-img-frame:nth-child(3) { transform: rotate(5deg); animation-delay: 0.34s; }
+
+.conv-img-art {
+    width: 100%;
+    height: 56px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--art-a, #60A5FA), var(--art-b, #2563EB));
+}
+
+.conv-img-ext {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #3F2313;
+    text-align: center;
+}
+
+/* Finale 4-Engine Grid */
+.finale-engines-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.65rem;
+    margin-top: 1rem;
+}
+
+.finale-engine-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #FFFFFF;
+    border: 1.5px solid #D8C5A5;
+    border-inline-start: 4px solid var(--pill-accent, #2563EB);
+    color: #2A170C;
+    padding: 0.45rem 0.9rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    box-shadow: 0 6px 14px rgba(58, 32, 17, 0.08);
+    animation: promoCardPop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.finale-engine-pill:nth-child(1) { --pill-accent: #E04F3E; animation-delay: 0.10s; }
+.finale-engine-pill:nth-child(2) { --pill-accent: #F2A93B; animation-delay: 0.18s; }
+.finale-engine-pill:nth-child(3) { --pill-accent: #3CA374; animation-delay: 0.26s; }
+.finale-engine-pill:nth-child(4) { --pill-accent: #2E78D2; animation-delay: 0.34s; }
+
+@media (prefers-reduced-motion: reduce) {
+    .promo-scene.scene-cinematic,
+    .promo-scene.scene-cinematic.scene-exiting,
+    .sov-ring-outer,
+    .sov-ring-mid,
+    .sov-orbit-tag,
+    .conv-prism-node {
+        animation: none !important;
+    }
+}
+
+
+/* Scene 7: Why Mnshor Beats Other Tools (2x2 Advantage Grid) */
+.why-grid {
+    width: min(760px, 95%);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.7rem;
+    margin-top: 0.9rem;
+    text-align: start;
+}
+
+.why-card {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #DFCEB2;
+    border-top: 3.5px solid var(--why-accent, #059669);
+    border-radius: 12px;
+    padding: 0.72rem 0.9rem;
+    box-shadow: 0 8px 18px rgba(58, 32, 17, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    animation: promoCardPop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.why-card:nth-child(1) { --why-accent: #059669; animation-delay: 0.08s; }
+.why-card:nth-child(2) { --why-accent: #D4A359; animation-delay: 0.16s; }
+.why-card:nth-child(3) { --why-accent: #2E78D2; animation-delay: 0.24s; }
+.why-card:nth-child(4) { --why-accent: #E04F3E; animation-delay: 0.32s; }
+
+.why-card-title {
+    font-size: 0.88rem;
+    font-weight: 800;
+    color: #2A170C;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.why-card-desc {
+    font-size: 0.78rem;
+    color: #5C4636;
+    line-height: 1.4;
+}
+
+/* Open-Source GitHub Pill in Finale */
+.promo-finale-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.15rem;
+}
+
+.promo-github-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #1E1B18;
+    color: #FAF4E8;
+    border: 1.5px solid #D4A359;
+    padding: 0.65rem 1.2rem;
+    border-radius: 12px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 10px 20px rgba(30, 27, 24, 0.22);
+    transition: transform 0.18s ease, background 0.18s ease;
+    animation: heroFadeSlideUp 0.55s 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.promo-github-pill:hover {
+    background: #0F0D0C;
+    transform: translateY(-2px);
+}
