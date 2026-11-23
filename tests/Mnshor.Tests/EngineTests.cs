@@ -1739,4 +1739,118 @@ End of report.
         var extracted = await _pdfImageConverter.ExtractEmbeddedImagesAsync(textOnlyPdf, ImageOutputFormat.Jpg);
         Assert.Empty(extracted);
     }
+
+    // =========================================================================
+    // Images to PDF Tests (JPG / PNG / WebP -> Merged PDF or Separate ZIP)
+    // =========================================================================
+
+    private static byte[] CreateSampleImageBytes(int width, int height, SkiaSharp.SKColor color, SkiaSharp.SKEncodedImageFormat fmt)
+    {
+        using var bmp = new SkiaSharp.SKBitmap(width, height);
+        using (var c = new SkiaSharp.SKCanvas(bmp)) c.Clear(color);
+        using var img = SkiaSharp.SKImage.FromBitmap(bmp);
+        return img.Encode(fmt, 90).ToArray();
+    }
+
+    [Fact]
+    public async Task LocalPdfImageConverter_ImagesToPdf_MergedA4AndLandscape_CreatesValidPdf()
+    {
+        var jpg = await _pdfImageConverter.InspectImageAsync("photo1.jpg", "image/jpeg", CreateSampleImageBytes(300, 200, SkiaSharp.SKColors.SteelBlue, SkiaSharp.SKEncodedImageFormat.Jpeg));
+        var png = await _pdfImageConverter.InspectImageAsync("diagram2.png", "image/png", CreateSampleImageBytes(200, 300, SkiaSharp.SKColors.Coral, SkiaSharp.SKEncodedImageFormat.Png));
+        var webp = await _pdfImageConverter.InspectImageAsync("graphic3.webp", "image/webp", CreateSampleImageBytes(250, 250, SkiaSharp.SKColors.MediumPurple, SkiaSharp.SKEncodedImageFormat.Webp));
+
+        Assert.NotNull(jpg);
+        Assert.NotNull(png);
+        Assert.NotNull(webp);
+        Assert.Equal(300, jpg!.Width);
+        Assert.Equal(200, jpg.Height);
+        Assert.StartsWith("data:image/png;base64,", jpg.PreviewDataUrl);
+
+        var res = await _pdfImageConverter.ConvertImagesToPdfAsync(
+            new[] { jpg, png!, webp! },
+            new ImagesToPdfOptions
+            {
+                PageSize = ImagePdfPageSize.A4,
+                Orientation = ImagePdfOrientation.Landscape,
+                Margin = ImagePdfMargin.Small,
+                MergeIntoSinglePdf = true
+            });
+
+        Assert.True(res.Success, res.ErrorMessage);
+        Assert.Equal("application/pdf", res.ContentType);
+        Assert.Equal(3, _pdfEngine.GetPageCount(res.OutputData));
+
+        using var ms = new MemoryStream(res.OutputData, writable: false);
+        using var pdf = PdfReader.Open(ms, PdfDocumentOpenMode.Import);
+        // A4 Landscape: width > height (~841.89 x 595.28 pt)
+        Assert.True(pdf.Pages[0].Width.Point > pdf.Pages[0].Height.Point);
+        Assert.InRange(pdf.Pages[0].Width.Point, 840, 844);
+        Assert.InRange(pdf.Pages[0].Height.Point, 593, 597);
+    }
+
+    [Fact]
+    public async Task LocalPdfImageConverter_ImagesToPdf_FitToImageAndRotation_AdjustsPageDimensions()
+    {
+        var wideImg = await _pdfImageConverter.InspectImageAsync("wide.jpg", "image/jpeg", CreateSampleImageBytes(400, 200, SkiaSharp.SKColors.Teal, SkiaSharp.SKEncodedImageFormat.Jpeg));
+        Assert.NotNull(wideImg);
+        wideImg!.RotationDegrees = 90; // After 90° rotation -> 200w x 400h (tall!)
+
+        var res = await _pdfImageConverter.ConvertImagesToPdfAsync(
+            new[] { wideImg },
+            new ImagesToPdfOptions
+            {
+                PageSize = ImagePdfPageSize.FitToImage,
+                Margin = ImagePdfMargin.None,
+                MergeIntoSinglePdf = true
+            });
+
+        Assert.True(res.Success, res.ErrorMessage);
+        using var ms = new MemoryStream(res.OutputData, writable: false);
+        using var pdf = PdfReader.Open(ms, PdfDocumentOpenMode.Import);
+        Assert.Equal(1, pdf.PageCount);
+        Assert.True(pdf.Pages[0].Height.Point > pdf.Pages[0].Width.Point);
+    }
+
+    [Fact]
+    public async Task LocalPdfImageConverter_ImagesToPdf_SeparateFilesMode_ReturnsValidZipOfPdfs()
+    {
+        var img1 = await _pdfImageConverter.InspectImageAsync("scan1.jpg", "image/jpeg", CreateSampleImageBytes(160, 120, SkiaSharp.SKColors.Navy, SkiaSharp.SKEncodedImageFormat.Jpeg));
+        var img2 = await _pdfImageConverter.InspectImageAsync("scan2.png", "image/png", CreateSampleImageBytes(160, 120, SkiaSharp.SKColors.DarkGreen, SkiaSharp.SKEncodedImageFormat.Png));
+
+        var res = await _pdfImageConverter.ConvertImagesToPdfAsync(
+            new[] { img1!, img2! },
+            new ImagesToPdfOptions
+            {
+                PageSize = ImagePdfPageSize.Letter,
+                Orientation = ImagePdfOrientation.Portrait,
+                Margin = ImagePdfMargin.Big,
+                MergeIntoSinglePdf = false
+            });
+
+        Assert.True(res.Success, res.ErrorMessage);
+        Assert.Equal("application/zip", res.ContentType);
+        Assert.EndsWith(".zip", res.OutputFileName, StringComparison.OrdinalIgnoreCase);
+
+        using var zipMs = new MemoryStream(res.OutputData, writable: false);
+        using var zip = new ZipArchive(zipMs, ZipArchiveMode.Read);
+        Assert.Equal(2, zip.Entries.Count);
+        Assert.Contains(zip.Entries, e => e.Name == "scan1.pdf");
+        Assert.Contains(zip.Entries, e => e.Name == "scan2.pdf");
+
+        foreach (var entry in zip.Entries)
+        {
+            using var es = entry.Open();
+            using var pMs = new MemoryStream();
+            es.CopyTo(pMs);
+            Assert.Equal(1, _pdfEngine.GetPageCount(pMs.ToArray()));
+        }
+    }
+
+    [Fact]
+    public async Task LocalPdfImageConverter_ImagesToPdf_EmptyInput_FailsSafely()
+    {
+        var res = await _pdfImageConverter.ConvertImagesToPdfAsync(Array.Empty<ImageToPdfInputItem>());
+        Assert.False(res.Success);
+        Assert.NotEmpty(res.ErrorMessage);
+    }
 }

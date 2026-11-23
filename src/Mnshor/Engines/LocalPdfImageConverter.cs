@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using Mnshor.Models;
+using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.Advanced;
 using PdfSharp.Pdf.IO;
@@ -477,4 +478,387 @@ public sealed class LocalPdfImageConverter : IPdfImageConverter
         ImageOutputFormat.WebP => "image/webp",
         _ => "image/jpeg"
     };
+
+    // =========================================================================
+    // Images -> PDF (JPG / PNG / WebP / BMP / GIF -> Single PDF or Separate ZIP)
+    // =========================================================================
+
+    public async Task<ImageToPdfInputItem?> InspectImageAsync(string fileName, string contentType, byte[] data)
+    {
+        if (data == null || data.Length == 0)
+            return null;
+
+        return await Task.Run(() =>
+        {
+            try
+            {
+                using var decoded = DecodeWithExifOrientation(data, extraRotationDegrees: 0);
+                if (decoded == null || decoded.Width <= 0 || decoded.Height <= 0)
+                    return null;
+
+                using var skImg = SKImage.FromBitmap(decoded);
+                string previewUrl = BuildThumbnailDataUrl(skImg);
+
+                return new ImageToPdfInputItem
+                {
+                    FileName = string.IsNullOrWhiteSpace(fileName) ? "image.png" : fileName,
+                    ContentType = string.IsNullOrWhiteSpace(contentType) ? "image/png" : contentType,
+                    Data = data,
+                    Width = decoded.Width,
+                    Height = decoded.Height,
+                    RotationDegrees = 0,
+                    PreviewDataUrl = previewUrl
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        });
+    }
+
+    public async Task<ExecutionResult> ConvertImagesToPdfAsync(
+        IReadOnlyList<ImageToPdfInputItem> images,
+        ImagesToPdfOptions? options = null,
+        IProgress<(int Current, int Total)>? progress = null)
+    {
+        if (images == null || images.Count == 0)
+        {
+            return ExecutionResult.Fail("Please add at least one image to convert to PDF.");
+        }
+
+        options ??= new ImagesToPdfOptions();
+        var sw = Stopwatch.StartNew();
+
+        return await Task.Run(() =>
+        {
+            try
+            {
+                double marginPt = options.GetMarginPoints();
+
+                // Mode A: Merge all images into a single PDF (or single image uploaded)
+                if (options.MergeIntoSinglePdf || images.Count == 1)
+                {
+                    using var doc = new PdfDocument();
+                    doc.Options.FlateEncodeMode = PdfFlateEncodeMode.BestCompression;
+                    doc.Info.Creator = "Mnshor Local PDF Suite";
+
+                    int added = 0;
+                    for (int i = 0; i < images.Count; i++)
+                    {
+                        var item = images[i];
+                        if (item.Data == null || item.Data.Length == 0) continue;
+
+                        if (AddImagePageToDocument(doc, item, options, marginPt))
+                        {
+                            added++;
+                        }
+
+                        progress?.Report((i + 1, images.Count));
+                    }
+
+                    if (added == 0)
+                    {
+                        return ExecutionResult.Fail("None of the uploaded images could be decoded into PDF pages.");
+                    }
+
+                    using var outMs = new MemoryStream();
+                    doc.Save(outMs, false);
+                    sw.Stop();
+
+                    string baseName = images.Count == 1
+                        ? Path.GetFileNameWithoutExtension(images[0].FileName)
+                        : "Images_Merged";
+                    if (string.IsNullOrWhiteSpace(baseName)) baseName = "Images";
+                    string fileName = $"{baseName}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+
+                    return ExecutionResult.Ok(
+                        outMs.ToArray(),
+                        fileName,
+                        $"Converted {added} image(s) into a {added}-page PDF in {sw.ElapsedMilliseconds} ms",
+                        sw.ElapsedMilliseconds,
+                        "application/pdf");
+                }
+
+                // Mode B: Separate PDF per image packaged into an in-memory ZIP archive
+                using var zipMs = new MemoryStream();
+                int exportedPdfs = 0;
+
+                using (var archive = new ZipArchive(zipMs, ZipArchiveMode.Create, leaveOpen: true))
+                {
+                    var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                    for (int i = 0; i < images.Count; i++)
+                    {
+                        var item = images[i];
+                        if (item.Data == null || item.Data.Length == 0) continue;
+
+                        using var singleDoc = new PdfDocument();
+                        singleDoc.Options.FlateEncodeMode = PdfFlateEncodeMode.BestCompression;
+                        singleDoc.Info.Creator = "Mnshor Local PDF Suite";
+
+                        if (AddImagePageToDocument(singleDoc, item, options, marginPt))
+                        {
+                            using var singleMs = new MemoryStream();
+                            singleDoc.Save(singleMs, false);
+                            byte[] pdfBytes = singleMs.ToArray();
+
+                            string stem = Path.GetFileNameWithoutExtension(item.FileName);
+                            if (string.IsNullOrWhiteSpace(stem)) stem = $"image_{i + 1:D3}";
+                            string entryName = $"{stem}.pdf";
+                            if (!usedNames.Add(entryName))
+                            {
+                                entryName = $"{stem}_{i + 1:D3}.pdf";
+                                usedNames.Add(entryName);
+                            }
+
+                            var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
+                            using var entryStream = entry.Open();
+                            entryStream.Write(pdfBytes, 0, pdfBytes.Length);
+                            exportedPdfs++;
+                        }
+
+                        progress?.Report((i + 1, images.Count));
+                    }
+                }
+
+                if (exportedPdfs == 0)
+                {
+                    return ExecutionResult.Fail("None of the uploaded images could be converted to PDF.");
+                }
+
+                sw.Stop();
+                string zipName = $"Images_PDFs_{DateTime.Now:yyyyMMdd_HHmmss}.zip";
+                return ExecutionResult.Ok(
+                    zipMs.ToArray(),
+                    zipName,
+                    $"Converted {exportedPdfs} image(s) into {exportedPdfs} separate PDF(s) (ZIP) in {sw.ElapsedMilliseconds} ms",
+                    sw.ElapsedMilliseconds,
+                    "application/zip");
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                return ExecutionResult.Fail($"Images to PDF error: {ex.Message}", sw.ElapsedMilliseconds);
+            }
+        });
+    }
+
+    private static bool AddImagePageToDocument(
+        PdfDocument doc,
+        ImageToPdfInputItem item,
+        ImagesToPdfOptions options,
+        double marginPt)
+    {
+        using var bmp = DecodeWithExifOrientation(item.Data, item.RotationDegrees);
+        if (bmp == null || bmp.Width <= 0 || bmp.Height <= 0)
+            return false;
+
+        // Determine whether the bitmap has any non-opaque pixel so opaque photos use compact JPEG
+        // while transparent PNGs/WebPs preserve transparency cleanly (or composite cleanly).
+        bool hasAlpha = HasTransparency(bmp);
+        byte[] normalizedBytes;
+        using (var skImg = SKImage.FromBitmap(bmp))
+        {
+            if (hasAlpha)
+            {
+                using var png = skImg.Encode(SKEncodedImageFormat.Png, 95);
+                normalizedBytes = png?.ToArray() ?? Array.Empty<byte>();
+            }
+            else
+            {
+                using var jpg = skImg.Encode(SKEncodedImageFormat.Jpeg, 92);
+                normalizedBytes = jpg?.ToArray() ?? Array.Empty<byte>();
+            }
+        }
+
+        if (normalizedBytes.Length == 0)
+            return false;
+
+        double pageW;
+        double pageH;
+
+        if (options.PageSize == ImagePdfPageSize.FitToImage)
+        {
+            // Map pixels at 96 DPI -> 72 pt/in (0.75 pt per px) with safe clamping for very large photos
+            const double pxToPt = 72.0 / 96.0;
+            double imgWpt = bmp.Width * pxToPt;
+            double imgHpt = bmp.Height * pxToPt;
+
+            // Keep extreme high-res images within reasonable PDF page bounds (max 1440 pt ~ 20 in)
+            double maxDim = Math.Max(imgWpt, imgHpt);
+            if (maxDim > 1440.0)
+            {
+                double clampScale = 1440.0 / maxDim;
+                imgWpt *= clampScale;
+                imgHpt *= clampScale;
+            }
+
+            pageW = Math.Max(72.0, imgWpt + (marginPt * 2.0));
+            pageH = Math.Max(72.0, imgHpt + (marginPt * 2.0));
+        }
+        else
+        {
+            (double baseW, double baseH) = options.PageSize == ImagePdfPageSize.Letter
+                ? (612.0, 792.0)      // US Letter (8.5 x 11 in)
+                : (595.28, 841.89);   // A4 (210 x 297 mm)
+
+            if (options.Orientation == ImagePdfOrientation.Landscape)
+            {
+                pageW = baseH;
+                pageH = baseW;
+            }
+            else
+            {
+                pageW = baseW;
+                pageH = baseH;
+            }
+        }
+
+        var page = doc.AddPage();
+        page.Width = XUnit.FromPoint(pageW);
+        page.Height = XUnit.FromPoint(pageH);
+
+        double availW = Math.Max(10.0, pageW - (marginPt * 2.0));
+        double availH = Math.Max(10.0, pageH - (marginPt * 2.0));
+
+        double scale = Math.Min(availW / bmp.Width, availH / bmp.Height);
+        double drawW = bmp.Width * scale;
+        double drawH = bmp.Height * scale;
+        double drawX = marginPt + (availW - drawW) / 2.0;
+        double drawY = marginPt + (availH - drawH) / 2.0;
+
+        using var imgStream = new MemoryStream(normalizedBytes, writable: false);
+        using var xImg = XImage.FromStream(imgStream);
+        using var gfx = XGraphics.FromPdfPage(page);
+        gfx.DrawImage(xImg, drawX, drawY, drawW, drawH);
+
+        return true;
+    }
+
+    private static SKBitmap? DecodeWithExifOrientation(byte[] data, int extraRotationDegrees)
+    {
+        using var skData = SKData.CreateCopy(data);
+        using var codec = SKCodec.Create(skData);
+        if (codec == null)
+            return null;
+
+        var info = new SKImageInfo(codec.Info.Width, codec.Info.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+        using var rawBmp = new SKBitmap(info);
+        var result = codec.GetPixels(info, rawBmp.GetPixels());
+        if (result != SKCodecResult.Success && result != SKCodecResult.IncompleteInput)
+            return null;
+
+        SKBitmap oriented = ApplyExifOrigin(rawBmp, codec.EncodedOrigin);
+        int normRot = ((extraRotationDegrees % 360) + 360) % 360;
+        if (normRot == 0)
+            return oriented;
+
+        try
+        {
+            return RotateBitmap(oriented, normRot);
+        }
+        finally
+        {
+            oriented.Dispose();
+        }
+    }
+
+    private static SKBitmap ApplyExifOrigin(SKBitmap src, SKEncodedOrigin origin)
+    {
+        if (origin == SKEncodedOrigin.TopLeft || origin == SKEncodedOrigin.Default)
+            return src.Copy();
+
+        bool swap = origin is SKEncodedOrigin.RightTop or SKEncodedOrigin.LeftBottom
+            or SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightBottom;
+
+        int dstW = swap ? src.Height : src.Width;
+        int dstH = swap ? src.Width : src.Height;
+
+        var dst = new SKBitmap(dstW, dstH, src.ColorType, src.AlphaType);
+        using var canvas = new SKCanvas(dst);
+        canvas.Clear(SKColors.Transparent);
+
+        switch (origin)
+        {
+            case SKEncodedOrigin.TopRight:
+                canvas.Scale(-1, 1, dstW / 2f, 0);
+                break;
+            case SKEncodedOrigin.BottomRight:
+                canvas.RotateDegrees(180, dstW / 2f, dstH / 2f);
+                break;
+            case SKEncodedOrigin.BottomLeft:
+                canvas.Scale(1, -1, 0, dstH / 2f);
+                break;
+            case SKEncodedOrigin.LeftTop:
+                canvas.RotateDegrees(90, dstW / 2f, dstH / 2f);
+                canvas.Translate((dstW - src.Width) / 2f, (dstH - src.Height) / 2f);
+                canvas.Scale(1, -1, src.Width / 2f, src.Height / 2f);
+                canvas.DrawBitmap(src, 0, 0);
+                return dst;
+            case SKEncodedOrigin.RightTop:
+                canvas.Translate(dstW, 0);
+                canvas.RotateDegrees(90);
+                break;
+            case SKEncodedOrigin.RightBottom:
+                canvas.RotateDegrees(270, dstW / 2f, dstH / 2f);
+                canvas.Translate((dstW - src.Width) / 2f, (dstH - src.Height) / 2f);
+                canvas.Scale(1, -1, src.Width / 2f, src.Height / 2f);
+                canvas.DrawBitmap(src, 0, 0);
+                return dst;
+            case SKEncodedOrigin.LeftBottom:
+                canvas.Translate(0, dstH);
+                canvas.RotateDegrees(270);
+                break;
+        }
+
+        canvas.DrawBitmap(src, 0, 0);
+        return dst;
+    }
+
+    private static SKBitmap RotateBitmap(SKBitmap src, int degrees)
+    {
+        bool swap = degrees is 90 or 270;
+        int dstW = swap ? src.Height : src.Width;
+        int dstH = swap ? src.Width : src.Height;
+
+        var dst = new SKBitmap(dstW, dstH, src.ColorType, src.AlphaType);
+        using var canvas = new SKCanvas(dst);
+        canvas.Clear(SKColors.Transparent);
+
+        if (degrees == 90)
+        {
+            canvas.Translate(dstW, 0);
+            canvas.RotateDegrees(90);
+        }
+        else if (degrees == 180)
+        {
+            canvas.Translate(dstW, dstH);
+            canvas.RotateDegrees(180);
+        }
+        else if (degrees == 270)
+        {
+            canvas.Translate(0, dstH);
+            canvas.RotateDegrees(270);
+        }
+
+        canvas.DrawBitmap(src, 0, 0);
+        return dst;
+    }
+
+    private static bool HasTransparency(SKBitmap bmp)
+    {
+        // Fast strided sample check (exact on small images, < 1ms on 4K images)
+        int stepX = Math.Max(1, bmp.Width / 64);
+        int stepY = Math.Max(1, bmp.Height / 64);
+        for (int y = 0; y < bmp.Height; y += stepY)
+        {
+            for (int x = 0; x < bmp.Width; x += stepX)
+            {
+                if (bmp.GetPixel(x, y).Alpha < 250)
+                    return true;
+            }
+        }
+        return false;
+    }
 }

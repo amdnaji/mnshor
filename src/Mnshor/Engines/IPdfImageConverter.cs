@@ -13,4 +13,11 @@ public interface IPdfImageConverter
         string originalFileName,
         IReadOnlyList<RenderedPdfPageImage> images,
         ImageOutputFormat format);
+
+    Task<ImageToPdfInputItem?> InspectImageAsync(string fileName, string contentType, byte[] data);
+
+    Task<ExecutionResult> ConvertImagesToPdfAsync(
+        IReadOnlyList<ImageToPdfInputItem> images,
+        ImagesToPdfOptions? options = null,
+        IProgress<(int Current, int Total)>? progress = null);
 }

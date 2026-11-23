@@ -1,0 +1,456 @@
+@page "/images-to-pdf"
+@page "/jpg-to-pdf"
+@rendermode InteractiveServer
+@inject LocalizationState Loc
+@inject IPdfImageConverter PdfImageConverter
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>@Loc["ImagesToPdfTitle"] - @Loc["AppName"]</PageTitle>
+
+<a href="/" class="back-link">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="@(Loc.IsRtl ? "transform: rotate(180deg);" : "")">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+    </svg>
+    <span>@Loc["BackToTools"]</span>
+</a>
+
+<div class="panel-card">
+    <div class="panel-header">
+        <div>
+            <h1 class="panel-title">@Loc["ImagesToPdfTitle"]</h1>
+            <p class="panel-desc">@Loc["ImagesToPdfDesc"]</p>
+        </div>
+    </div>
+
+    @if (isLoadingFiles)
+    {
+        <div class="mnshor-loading-card" style="margin-bottom: 1rem;">
+            <div class="mnshor-spinner"></div>
+            <div style="font-weight: 700; font-size: 0.96rem; color: var(--text-primary);">@Loc["LoadingImagesStatus"]</div>
+            <div class="mnshor-progress-wrap" style="max-width: 340px;">
+                <div class="mnshor-progress-header">
+                    <span>@loadingStepText</span>
+                    <span>@loadingProgressPercent%</span>
+                </div>
+                <div class="mnshor-progress-track">
+                    <div class="mnshor-progress-fill" style="width: @(loadingProgressPercent)%;"></div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (images.Count == 0)
+    {
+        <label class="smart-dropzone" style="@(isLoadingFiles ? "display: none;" : "")">
+            <InputFile class="dropzone-input-overlay" OnChange="OnFilesSelectedAsync" multiple accept=".jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" />
+            <div class="dropzone-icon" style="color: #7C3AED; background: #F5F3FF;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <circle cx="10" cy="13" r="1.5"></circle>
+                    <polyline points="18 18 14 14 8 20"></polyline>
+                </svg>
+            </div>
+            <div class="dropzone-text">@Loc["SelectImagesForPdfPrompt"]</div>
+            <div class="dropzone-subtext">JPG, PNG, WebP, BMP, GIF — 100% Local In-Memory Engine (Up to 200 images)</div>
+        </label>
+    }
+    else
+    {
+        <div class="excel-md-workspace">
+            <!-- Left Main Stage: Image Queue & Reorder/Rotate Controls -->
+            <div class="watermark-main-stage">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <span style="font-size: 0.9rem; font-weight: 700; color: var(--text-secondary);">
+                        @Loc["ImagesQueuedCount"] (@images.Count)
+                    </span>
+                    <div style="display: flex; gap: 0.45rem; flex-wrap: wrap; align-items: center;">
+                        <label class="wm-preset-chip" style="cursor: pointer; position: relative; overflow: hidden; border-color: #7C3AED; color: #7C3AED; background: #F5F3FF; font-weight: 700;">
+                            <span>@Loc["AddMoreImages"]</span>
+                            <InputFile OnChange="OnFilesSelectedAsync" multiple accept=".jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="position: absolute; inset: 0; opacity: 0; cursor: pointer;" />
+                        </label>
+                        <button type="button" class="wm-preset-chip" @onclick="SortAscending">@Loc["SortAZ"]</button>
+                        <button type="button" class="wm-preset-chip" @onclick="SortDescending">@Loc["SortZA"]</button>
+                        <button type="button" class="wm-preset-chip" @onclick="ReverseOrder">@Loc["ReverseOrder"]</button>
+                        <button type="button" class="wm-preset-chip" @onclick="RotateAll90">@Loc["RotateAll90"]</button>
+                        <button type="button" class="wm-preset-chip" style="color: var(--danger); border-color: var(--danger-border);" @onclick="ClearAll">@Loc["ClearAll"]</button>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(195px, 1fr)); gap: 0.95rem;">
+                    @for (int i = 0; i < images.Count; i++)
+                    {
+                        int idx = i;
+                        var item = images[idx];
+                        <div @key="item.Id" class="page-thumbnail-card" style="border-color: var(--border-subtle); gap: 0.5rem;">
+                            <div class="page-card-header">
+                                <span class="page-index-pill">#@(idx + 1)</span>
+                                <div style="display: flex; gap: 0.25rem;">
+                                    <button type="button"
+                                            class="wm-preset-chip"
+                                            style="padding: 0.15rem 0.42rem; font-size: 0.74rem;"
+                                            title="Rotate 90°"
+                                            @onclick="() => RotateItem(idx)">↻</button>
+                                    <button type="button"
+                                            class="wm-preset-chip"
+                                            style="padding: 0.15rem 0.42rem; font-size: 0.74rem; color: var(--danger); border-color: var(--danger-border);"
+                                            title="Remove"
+                                            @onclick="() => RemoveItem(idx)">×</button>
+                                </div>
+                            </div>
+
+                            <div style="width: 100%; height: 150px; display: flex; align-items: center; justify-content: center; background: repeating-conic-gradient(#F1F5F9 0% 25%, #FFFFFF 0% 50%) 50% / 14px 14px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-subtle);">
+                                @if (!string.IsNullOrEmpty(item.PreviewDataUrl))
+                                {
+                                    <img src="@item.PreviewDataUrl"
+                                         alt="@item.FileName"
+                                         style="max-width: 88%; max-height: 88%; object-fit: contain; transition: transform 0.2s ease; transform: rotate(@(item.RotationDegrees)deg);" />
+                                }
+                            </div>
+
+                            <div style="font-weight: 600; font-size: 0.8rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="@item.FileName">
+                                @item.FileName
+                            </div>
+
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.3rem;">
+                                <span style="font-size: 0.72rem; color: var(--text-secondary);">@item.Width×@item.Height • @item.FormattedSize</span>
+                                <div style="display: flex; gap: 0.2rem;">
+                                    <button type="button"
+                                            class="wm-preset-chip"
+                                            style="padding: 0.12rem 0.38rem; font-size: 0.72rem;"
+                                            disabled="@(idx == 0)"
+                                            @onclick="() => MoveItem(idx, idx - 1)">◀</button>
+                                    <button type="button"
+                                            class="wm-preset-chip"
+                                            style="padding: 0.12rem 0.38rem; font-size: 0.72rem;"
+                                            disabled="@(idx == images.Count - 1)"
+                                            @onclick="() => MoveItem(idx, idx + 1)">▶</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Right Sidebar (iLovePDF JPG-to-PDF Layout Controls) -->
+            <aside class="watermark-sidebar">
+                <div class="watermark-sidebar-header">
+                    @Loc["PageSetupTitle"]
+                </div>
+
+                <div class="watermark-sidebar-body">
+                    <!-- Page Orientation -->
+                    <div class="wm-section">
+                        <label class="wm-label">@Loc["PageOrientationLabel"]</label>
+                        <div class="layer-selector-grid" style="@(options.PageSize == ImagePdfPageSize.FitToImage ? "opacity: 0.45; pointer-events: none;" : "")">
+                            <button type="button"
+                                    class="layer-card @(options.Orientation == ImagePdfOrientation.Portrait ? "active" : "")"
+                                    @onclick="() => options.Orientation = ImagePdfOrientation.Portrait">
+                                <span>▯ @Loc["OrientationPortrait"]</span>
+                            </button>
+                            <button type="button"
+                                    class="layer-card @(options.Orientation == ImagePdfOrientation.Landscape ? "active" : "")"
+                                    @onclick="() => options.Orientation = ImagePdfOrientation.Landscape">
+                                <span>▭ @Loc["OrientationLandscape"]</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Page Size -->
+                    <div class="wm-section">
+                        <label class="wm-label">@Loc["PageSizeLabel"]</label>
+                        <select class="compact-input" style="width: 100%; padding: 0.5rem;" @bind="options.PageSize">
+                            <option value="@ImagePdfPageSize.FitToImage">@Loc["PageSizeFit"]</option>
+                            <option value="@ImagePdfPageSize.A4">@Loc["PageSizeA4"]</option>
+                            <option value="@ImagePdfPageSize.Letter">@Loc["PageSizeLetter"]</option>
+                        </select>
+                    </div>
+
+                    <!-- Margin -->
+                    <div class="wm-section">
+                        <label class="wm-label">@Loc["MarginLabel"]</label>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45rem;">
+                            <button type="button"
+                                    class="layer-card @(options.Margin == ImagePdfMargin.None ? "active" : "")"
+                                    @onclick="() => options.Margin = ImagePdfMargin.None">@Loc["MarginNone"]</button>
+                            <button type="button"
+                                    class="layer-card @(options.Margin == ImagePdfMargin.Small ? "active" : "")"
+                                    @onclick="() => options.Margin = ImagePdfMargin.Small">@Loc["MarginSmall"]</button>
+                            <button type="button"
+                                    class="layer-card @(options.Margin == ImagePdfMargin.Big ? "active" : "")"
+                                    @onclick="() => options.Margin = ImagePdfMargin.Big">@Loc["MarginBig"]</button>
+                        </div>
+                    </div>
+
+                    <!-- Merge Option -->
+                    <div class="wm-section">
+                        <label class="mosaic-toggle-card @(options.MergeIntoSinglePdf ? "active" : "")">
+                            <input type="checkbox" @bind="options.MergeIntoSinglePdf" />
+                            <span style="font-size: 0.83rem; font-weight: 600;">@Loc["MergeAllImagesToggle"]</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="watermark-sidebar-footer">
+                    <button type="button"
+                            class="btn-primary-action"
+                            disabled="@(isProcessing || isLoadingFiles || images.Count == 0)"
+                            @onclick="ExecuteConvertAsync">
+                        @if (isProcessing)
+                        {
+                            <span>@Loc["Processing"] (@convertProgressPercent%)</span>
+                        }
+                        else
+                        {
+                            <span>@Loc["ConvertImagesToPdfBtn"] (@images.Count)</span>
+                        }
+                    </button>
+
+                    @if (isProcessing)
+                    {
+                        <div class="mnshor-progress-wrap">
+                            <div class="mnshor-progress-header">
+                                <span>@convertStatusText</span>
+                                <span>@convertProgressPercent%</span>
+                            </div>
+                            <div class="mnshor-progress-track">
+                                <div class="mnshor-progress-fill" style="width: @(convertProgressPercent)%;"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </aside>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="margin-top: 1.25rem; padding: 0.85rem 1.25rem; background: var(--danger-surface); border: 1px solid var(--danger-border); border-radius: 8px; color: var(--danger); font-size: 0.9rem;">
+            @errorMessage
+        </div>
+    }
+
+    @if (lastResult != null && lastResult.Success)
+    {
+        <div class="telemetry-card">
+            <div class="telemetry-header">
+                <span style="display: flex; align-items: center; gap: 0.4rem;">
+                    <span>✓ @Loc["ImagesToPdfSuccess"]</span>
+                </span>
+                <span class="telemetry-speed">⚡ @lastResult.ElapsedMilliseconds @Loc["Milliseconds"]</span>
+            </div>
+            <div class="telemetry-summary">@lastResult.Summary</div>
+            <div class="telemetry-note">@Loc["ZeroDiskIoNotice"]</div>
+            <div style="margin-top: 0.35rem;">
+                <button type="button" class="btn-primary-action" style="padding: 0.65rem 1.5rem; font-size: 0.92rem; width: auto;" @onclick="DownloadAgainAsync">
+                    <span>@Loc["DownloadResult"] (@lastResult.OutputFileName)</span>
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private ImagesToPdfOptions options = new();
+    private List<ImageToPdfInputItem> images = new();
+
+    private bool isLoadingFiles = false;
+    private int loadingProgressPercent = 0;
+    private string loadingStepText = string.Empty;
+
+    private bool isProcessing = false;
+    private int convertProgressPercent = 0;
+    private string convertStatusText = string.Empty;
+
+    private string? errorMessage;
+    private ExecutionResult? lastResult;
+
+    protected override void OnInitialized()
+    {
+        Loc.OnChange += StateHasChanged;
+    }
+
+    private async Task OnFilesSelectedAsync(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        lastResult = null;
+
+        var selectedFiles = e.GetMultipleFiles(maximumFileCount: 200);
+        if (selectedFiles.Count == 0) return;
+
+        isLoadingFiles = true;
+        loadingProgressPercent = 5;
+        loadingStepText = $"0 / {selectedFiles.Count}";
+        StateHasChanged();
+        await Task.Yield();
+
+        int skipped = 0;
+        var newlyLoaded = new List<ImageToPdfInputItem>(selectedFiles.Count);
+        try
+        {
+            for (int i = 0; i < selectedFiles.Count; i++)
+            {
+                var file = selectedFiles[i];
+                loadingStepText = $"{i + 1} / {selectedFiles.Count}";
+                loadingProgressPercent = Math.Clamp((int)Math.Round(((i + 1) / (double)selectedFiles.Count) * 100.0), 5, 100);
+                StateHasChanged();
+
+                try
+                {
+                    using var ms = new MemoryStream();
+                    using var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+                    await stream.CopyToAsync(ms);
+                    var data = ms.ToArray();
+
+                    var inspected = await PdfImageConverter.InspectImageAsync(file.Name, file.ContentType, data);
+                    if (inspected != null)
+                    {
+                        newlyLoaded.Add(inspected);
+                    }
+                    else
+                    {
+                        skipped++;
+                    }
+                }
+                catch
+                {
+                    skipped++;
+                }
+            }
+
+            if (newlyLoaded.Count > 0)
+            {
+                images.AddRange(newlyLoaded);
+            }
+
+            if (skipped > 0)
+            {
+                errorMessage = $"{skipped} file(s) could not be read as valid images and were skipped.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading images: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingFiles = false;
+            loadingProgressPercent = 0;
+            loadingStepText = string.Empty;
+        }
+    }
+
+    private void MoveItem(int fromIndex, int toIndex)
+    {
+        if (fromIndex < 0 || fromIndex >= images.Count || toIndex < 0 || toIndex >= images.Count) return;
+        var item = images[fromIndex];
+        images.RemoveAt(fromIndex);
+        images.Insert(toIndex, item);
+    }
+
+    private void RotateItem(int index)
+    {
+        if (index < 0 || index >= images.Count) return;
+        images[index].RotationDegrees = (images[index].RotationDegrees + 90) % 360;
+    }
+
+    private void RemoveItem(int index)
+    {
+        if (index < 0 || index >= images.Count) return;
+        images.RemoveAt(index);
+    }
+
+    private void SortAscending() => images = images.OrderBy(x => x.FileName, StringComparer.OrdinalIgnoreCase).ToList();
+
+    private void SortDescending() => images = images.OrderByDescending(x => x.FileName, StringComparer.OrdinalIgnoreCase).ToList();
+
+    private void ReverseOrder() => images.Reverse();
+
+    private void RotateAll90()
+    {
+        foreach (var img in images)
+            img.RotationDegrees = (img.RotationDegrees + 90) % 360;
+    }
+
+    private void ClearAll()
+    {
+        images.Clear();
+        lastResult = null;
+        errorMessage = null;
+    }
+
+    private async Task ExecuteConvertAsync()
+    {
+        if (images.Count == 0) return;
+
+        errorMessage = null;
+        isProcessing = true;
+        convertProgressPercent = 5;
+        convertStatusText = $"{Loc["StageConvertingImages"]} (0/{images.Count})";
+        StateHasChanged();
+        await Task.Yield();
+
+        try
+        {
+            var progress = new Progress<(int Current, int Total)>(p =>
+            {
+                _ = InvokeAsync(() =>
+                {
+                    if (!isProcessing) return;
+                    convertProgressPercent = p.Total > 0 ? Math.Clamp((int)Math.Round((p.Current / (double)p.Total) * 95.0), 5, 95) : 50;
+                    convertStatusText = $"{Loc["StageConvertingImages"]} ({p.Current}/{p.Total})";
+                    StateHasChanged();
+                });
+            });
+
+            lastResult = await PdfImageConverter.ConvertImagesToPdfAsync(images, options, progress);
+            if (lastResult.Success)
+            {
+                convertProgressPercent = 100;
+                StateHasChanged();
+                await DownloadResultAsync(lastResult);
+            }
+            else
+            {
+                errorMessage = lastResult.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+            convertProgressPercent = 0;
+            convertStatusText = string.Empty;
+        }
+    }
+
+    private async Task DownloadAgainAsync()
+    {
+        if (lastResult != null && lastResult.Success)
+        {
+            await DownloadResultAsync(lastResult);
+        }
+    }
+
+    private async Task DownloadResultAsync(ExecutionResult result)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("mnshor.downloadFileFromByteArray", result.OutputFileName, result.ContentType, result.OutputData);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    public void Dispose()
+    {
+        Loc.OnChange -= StateHasChanged;
+    }
+}
